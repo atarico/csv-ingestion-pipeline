@@ -9,8 +9,6 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     env: { TZ: 'UTC' },
-    // Commit A ships no tests yet; removed once the first test file exists.
-    passWithNoTests: true,
   },
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
 });
