@@ -1,0 +1,52 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../../../../generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UploadStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Upload {
+  id            String       @id
+  fileName      String
+  fileKey       String
+  status        UploadStatus @default(PENDING)
+  userId        String
+  totalRows     Int?
+  processedRows Int?
+  failedRows    Int?
+  errorMessage  String?
+  rowErrors     Json?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  activityData ActivityData[]
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model ActivityData {
+  id        String   @id
+  uploadId  String
+  rowNumber Int
+  category  String
+  amount    Decimal  @db.Decimal(14, 4)
+  unit      String
+  date      DateTime @db.Date
+  createdAt DateTime @default(now())
+
+  upload Upload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+
+  @@unique([uploadId, rowNumber])
+  @@index([uploadId])
+}
