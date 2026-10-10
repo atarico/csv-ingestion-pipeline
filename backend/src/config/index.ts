@@ -23,8 +23,8 @@ export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
     aws: {
       region: { format: String, default: 'us-east-1', env: 'AWS_REGION' },
       endpoint: { format: String, default: null, nullable: true, env: 'AWS_ENDPOINT' },
-      accessKeyId: { format: String, default: 'test', env: 'AWS_ACCESS_KEY_ID' },
-      secretAccessKey: { format: String, default: 'test', env: 'AWS_SECRET_ACCESS_KEY', sensitive: true },
+      accessKeyId: { format: String, default: '', env: 'AWS_ACCESS_KEY_ID', sensitive: true },
+      secretAccessKey: { format: String, default: '', env: 'AWS_SECRET_ACCESS_KEY', sensitive: true },
       s3Bucket: { format: String, default: 'document-processing', env: 'S3_BUCKET' },
       s3ForcePathStyle: { format: Boolean, default: true, env: 'S3_FORCE_PATH_STYLE' },
       sqsQueueUrl: { format: String, default: '', env: 'SQS_QUEUE_URL' },
@@ -49,6 +49,9 @@ export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
   const config = schema.getProperties();
   if (config.databaseUrl === '') throw new Error('DATABASE_URL is required');
   if (config.aws.sqsQueueUrl === '') throw new Error('SQS_QUEUE_URL is required');
+  if ((config.aws.accessKeyId === '') !== (config.aws.secretAccessKey === '')) {
+    throw new Error('AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set together or both left empty');
+  }
   if (config.aws.endpoint === '') return { ...config, aws: { ...config.aws, endpoint: null } };
   return config;
 }

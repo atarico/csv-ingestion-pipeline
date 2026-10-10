@@ -12,5 +12,5 @@ export interface WorkerPolicy {
   /** Injected in tests; defaults to Math.random. */
   random?: () => number;
   /** Injected in tests; defaults to the real sleep. */
-  sleep?: (ms: number) => Promise<void>;
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }

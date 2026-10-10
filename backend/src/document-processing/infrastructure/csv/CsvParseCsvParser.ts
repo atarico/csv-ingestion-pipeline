@@ -61,6 +61,9 @@ export class CsvParseCsvParser implements ICsvParser {
         return Either.left(new CsvFormatError(`Malformed CSV: ${error.message}`));
       }
       throw error; // storage/stream failures are not CSV format errors
+    } finally {
+      // pipe() never closes the source when the parser stops early; release the S3 socket.
+      if (!stream.destroyed) stream.destroy();
     }
   }
 }

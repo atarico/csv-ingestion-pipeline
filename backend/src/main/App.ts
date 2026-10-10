@@ -4,6 +4,7 @@ import multipart from '@fastify/multipart';
 import type { AwilixContainer } from 'awilix';
 import fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import type pino from 'pino';
+import * as z from 'zod';
 import type { AppConfig } from '../config/IConvictProps.js';
 import { documentProcessingRoutes } from '../document-processing/presentation/routes/DocumentProcessingRoutes.js';
 import { DomainError } from '../shared/domain/DomainError.js';
@@ -21,13 +22,18 @@ export function buildApp(container: AwilixContainer): FastifyInstance {
 
   const app = fastify({
     loggerInstance,
-    genReqId: () => randomUUID(),
-    requestIdHeader: 'x-request-id',
+    // Fastify would trust any header value; only a well-formed UUID is kept, the rest is replaced.
+    requestIdHeader: false,
+    genReqId: (req) => {
+      const supplied = z.uuid().safeParse(req.headers['x-request-id']);
+      return supplied.success ? supplied.data : randomUUID();
+    },
     bodyLimit: maxBytes + 1024 * 1024,
   });
 
   app.register(cors, { origin: config.corsOrigin });
-  app.register(multipart, { limits: { fileSize: maxBytes, files: 1 } });
+  // One file part and nothing else; busboy counts the file as one of the two allowed parts.
+  app.register(multipart, { limits: { fileSize: maxBytes, files: 1, fields: 0, parts: 2 } });
 
   app.addHook('onSend', (request, reply) => {
     reply.header('x-request-id', request.id);
@@ -62,6 +68,15 @@ export function buildApp(container: AwilixContainer): FastifyInstance {
     }
     if (errorCode === 'FST_INVALID_MULTIPART_CONTENT_TYPE') {
       return send(400, 'VALIDATION_ERROR', 'Expected multipart/form-data');
+    }
+    if (
+      errorCode === 'FST_FIELDS_LIMIT' ||
+      errorCode === 'FST_FILES_LIMIT' ||
+      errorCode === 'FST_PARTS_LIMIT'
+    ) {
+      return send(400, 'VALIDATION_ERROR', 'Send exactly one multipart file field named "file"', [
+        { field: 'file', message: 'must be the only multipart part, named "file"' },
+      ]);
     }
     const statusCode = (error as { statusCode?: unknown }).statusCode;
     if (typeof statusCode === 'number' && statusCode >= 400 && statusCode <= 499) {

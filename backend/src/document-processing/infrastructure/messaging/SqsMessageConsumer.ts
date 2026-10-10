@@ -24,7 +24,10 @@ function safeJsonParse(raw: string | undefined): unknown {
   }
 }
 
-/** Transport failures propagate: the worker loop is the catch boundary. */
+/**
+ * Transport failures propagate: the worker loop is the catch boundary.
+ * The one exception is an aborted long poll, which is a shutdown and returns no messages.
+ */
 export class SqsMessageConsumer implements IMessageConsumer {
   constructor(
     private readonly sqsClient: SQSClient,
@@ -32,16 +35,23 @@ export class SqsMessageConsumer implements IMessageConsumer {
     private readonly sqsConsumerOptions: SqsConsumerOptions,
   ) {}
 
-  async receive(): Promise<ReceivedMessage[]> {
-    const response = await this.sqsClient.send(
-      new ReceiveMessageCommand({
-        QueueUrl: this.sqsQueueUrl,
-        MaxNumberOfMessages: this.sqsConsumerOptions.maxMessages,
-        WaitTimeSeconds: this.sqsConsumerOptions.waitTimeSeconds,
-        VisibilityTimeout: this.sqsConsumerOptions.visibilityTimeoutSeconds,
-        MessageSystemAttributeNames: ['ApproximateReceiveCount'],
-      }),
-    );
+  async receive(signal?: AbortSignal): Promise<ReceivedMessage[]> {
+    let response;
+    try {
+      response = await this.sqsClient.send(
+        new ReceiveMessageCommand({
+          QueueUrl: this.sqsQueueUrl,
+          MaxNumberOfMessages: this.sqsConsumerOptions.maxMessages,
+          WaitTimeSeconds: this.sqsConsumerOptions.waitTimeSeconds,
+          VisibilityTimeout: this.sqsConsumerOptions.visibilityTimeoutSeconds,
+          MessageSystemAttributeNames: ['ApproximateReceiveCount'],
+        }),
+        { abortSignal: signal },
+      );
+    } catch (error) {
+      if (signal?.aborted === true) return [];
+      throw error;
+    }
 
     const received: ReceivedMessage[] = [];
     for (const message of response.Messages ?? []) {

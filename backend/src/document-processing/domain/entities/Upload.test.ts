@@ -209,4 +209,22 @@ describe('Upload', () => {
     expect(restored.id).toBe('fixed-id');
     expect(restored.status).toBe(UploadStatus.COMPLETED);
   });
+
+  it('toProps returns a copy that cannot mutate the entity', () => {
+    const upload = processing();
+    upload.fail('boom', { processedRows: 1, failedRows: 2, rowErrors: errors(2) });
+
+    const props = upload.toProps();
+    expect(props.status).toBe(UploadStatus.FAILED);
+    expect(props.rowErrors).toEqual(errors(2));
+
+    props.rowErrors.push({ row: 99, message: 'tampered' });
+    props.rowErrors[0]!.message = 'tampered';
+    props.createdAt.setUTCFullYear(1999);
+    props.processedRows = 42;
+
+    expect(upload.rowErrors).toEqual(errors(2));
+    expect(upload.createdAt.getUTCFullYear()).toBe(2024);
+    expect(upload.processedRows).toBe(1);
+  });
 });

@@ -15,7 +15,7 @@ test.describe('CSV upload flow', () => {
     await page.getByRole('link', { name: 'Volver a la lista' }).click();
     const row = page.getByRole('row').filter({ hasText: name });
     await expect(row).toBeVisible();
-    await expect(row.getByRole('status')).toHaveText('Completado');
+    await expect(row.getByRole('cell', { name: 'Completado', exact: true })).toBeVisible();
     await expect(row.getByRole('cell', { name: '60/60' })).toBeVisible();
   });
 

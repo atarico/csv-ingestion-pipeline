@@ -21,10 +21,14 @@ export function validateHeader(normalizedHeaders: string[]): Either<CsvFormatErr
     (name) => normalizedHeaders.filter((header) => header === name).length > 1,
   );
 
+  // An empty name would render as a blank slot in the list, so quote it.
+  const render = (names: string[]): string =>
+    names.map((name) => (name === '' ? '""' : name)).join(', ');
+
   const parts: string[] = [];
-  if (missing.length > 0) parts.push(`missing [${missing.join(', ')}]`);
-  if (unexpected.length > 0) parts.push(`unexpected [${unexpected.join(', ')}]`);
-  if (duplicated.length > 0) parts.push(`duplicated columns: ${duplicated.join(', ')}`);
+  if (missing.length > 0) parts.push(`missing [${render(missing)}]`);
+  if (unexpected.length > 0) parts.push(`unexpected [${render(unexpected)}]`);
+  if (duplicated.length > 0) parts.push(`duplicated columns: ${render(duplicated)}`);
 
   if (parts.length === 0) return Either.right(undefined);
   return Either.left(new CsvFormatError(`Invalid CSV header: ${parts.join(', ')}`));

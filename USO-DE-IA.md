@@ -1,3 +1,5 @@
+<!-- Borrador en primera persona generado a partir de los hechos del proceso. Validar cada frase antes de enviar. -->
+
 # Uso de Inteligencia Artificial en esta Prueba
 
 ## Herramientas utilizadas
@@ -9,23 +11,30 @@
 
 ## Cómo se trabajó
 
-Se trabajó en dos fases con Claude Code. En una sesión de planificación (2026-10-09) se
-revisó el documento de la prueba técnica, se detectaron las inconsistencias que figuran en
+Trabajé en tres fases con Claude Code. En una sesión de planificación (2026-10-09)
+revisamos el documento de la prueba técnica, detectamos las inconsistencias que figuran en
 el README en "Decisiones ante ambigüedades del enunciado" (por ejemplo, la cola en memoria
 que no puede compartirse entre procesos, el estado `PROCESSING` que nunca se asignaba o el
 orden entre encolar y crear el registro) y se produjo una especificación por capas (diez
 documentos, de cimientos a entregables) con versiones fijadas y criterios de aceptación.
 
-En una segunda fase, Claude Code implementó el código capa por capa a partir de esa
+En la segunda fase, Claude Code implementó el código capa por capa a partir de esa
 especificación. El agente principal (modelo Opus 5.5) delegó cada capa en sub-agentes
 (modelo Sonnet), que escribieron primero las pruebas y las vieron fallar, implementaron
 hasta que pasaran y ejecutaron `lint`, `typecheck` y las pruebas antes de cada commit. Se
 usó una rama por capa (`feat/01-foundations` a `docs/10-deliverables`), unida a `main` con
-`git merge --no-ff`, y commits convencionales atómicos. Después de los commits en los que
-el candidato concedió el consentimiento se ejecutó el paso de revisión nativa de la
-herramienta (gentle-ai, revisión guiada por recibos), cuyos hallazgos se resumen más
-abajo. Además de este documento, el candidato recibió un informe didáctico por capa
-(fuera del repositorio) para poder defender cada decisión.
+`git merge --no-ff`, y commits convencionales atómicos. Después de cada commit, la
+herramienta de orquestación ejecutó una revisión de código automática, con mi
+consentimiento (en la ronda de correcciones concedí todos los avisos). Sus hallazgos
+no bloqueantes que no se corrigieron están en el README, en "Limitaciones conocidas".
+Además de este documento, recibí un informe didáctico por capa (fuera del repositorio).
+
+En la tercera fase pedí una revisión independiente del resultado, hecha con cuatro
+revisores de código, una evaluación con rúbrica y un verificador que ejecutó cada
+comprobación; produjo `informes/11-revision-completa.md` (fuera del repositorio). A partir
+de ese informe solicité una ronda de correcciones, que Claude Code aplicó en la rama
+`fix/12-review-followups` con un commit por tarea, pruebas primero y una revisión
+automática después de cada commit.
 
 ## Qué se generó con IA
 
@@ -39,20 +48,22 @@ abajo. Además de este documento, el candidato recibió un informe didáctico po
 - [x] Adaptadores: repositorios Prisma, S3, SQS y contenedor de Awilix
 - [x] API REST con Fastify y manejo de errores centralizado
 - [x] Worker con reintentos con backoff, DLQ y apagado ordenado
-- [x] Pruebas unitarias y de integración (194 en el backend)
+- [x] Pruebas unitarias y de integración (220 en el backend tras la ronda de correcciones)
 
 ### Frontend
 - [x] Scaffold de Next.js 16 con React Query, axios y Tailwind 4
 - [x] Dashboard, listado, formulario de subida y detalle con polling cada 3 s
-- [x] Componentes, hooks y pruebas (20 en el frontend)
+- [x] Componentes, hooks y pruebas (44 en el frontend tras la ronda de correcciones)
 
 ### Infraestructura y documentación
 - [x] Docker Compose con PostgreSQL y LocalStack, y script de inicialización de AWS
 - [x] Dockerfiles y perfil `app` de Compose
+- [x] Capa E2E: paquete `e2e/` con cuatro pruebas de navegador (Playwright, Chromium) contra el stack de Compose, y un job `e2e` en el workflow de CI
 - [x] Workflow de CI de GitHub Actions (no ejecutado en GitHub, ver más abajo)
+- [x] Ronda de correcciones tras la revisión independiente (ver la sección siguiente)
 - [x] Diagramas de flujo y de arquitectura AWS (Mermaid y PNG)
 - [x] Archivos CSV de ejemplo y el generador del archivo grande
-- [x] README, este documento y el informe por capa del candidato
+- [x] README, este documento y los informes por capa (estos últimos, fuera del repositorio)
 
 ## Qué se modificó o corrigió durante la implementación
 
@@ -78,6 +89,31 @@ otra forma:
   existe en la imagen actual de `mermaid-cli`; se usó `-s 2` (escala) y el PNG se generó con
   la imagen `minlag/mermaid-cli`.
 - Se añadió `AGENTS.md` a `frontend/.gitignore`: `next dev` (16.4) lo genera.
+
+Tras la revisión independiente, Claude Code aplicó estas correcciones (commits `05f231c` a
+`95b1f55`), cada una con su prueba escrita antes:
+
+- B1: el parser de CSV destruye el stream de origen cuando se detiene antes de tiempo.
+- B2: el formulario ignora los archivos soltados mientras hay una subida en curso y reinicia
+  el campo de archivo, de modo que se puede elegir el mismo archivo dos veces.
+- B3: el long polling y la espera del backoff del worker se cancelan al apagar;
+  `docker compose stop worker` pasó a tardar 0,3 s (código 0) y se añadió
+  `stop_grace_period`.
+- B4: healthchecks de preparación para LocalStack (init y ready), la API y el frontend.
+- B5: la imagen de Docker del backend se construye sin archivos de entorno.
+- B6: el repositorio en memoria de las pruebas guarda copias, por lo que las pruebas
+  comprueban la persistencia de verdad.
+- B7: las claves de AWS son opcionales; sin ellas se usa la cadena de credenciales por
+  defecto.
+- B8: pruebas de las ramas de fallo (segunda descarga fallida y fallos del parser).
+- B9: los value objects de texto rechazan caracteres de control.
+- B10: la paginación tiene desempate determinista (`createdAt` y `id`, descendentes).
+- Lote menor: límites y nombre de campo del multipart, tope del parámetro `page`, validación
+  del `x-request-id`, mensaje de cabecera `unexpected [""]`, fijación de `@prisma/adapter-pg`,
+  ajuste de `page` y mensaje de página inexistente en el frontend, sin reintentos ante 4xx,
+  regiones en vivo en los badges y `HOSTNAME`/`PORT` en el Dockerfile.
+- Documentación: `NODE_ENV=development` en `backend/.env.example`, README en lenguaje de
+  producto con las limitaciones actualizadas y este documento.
 
 ## Qué aprendí
 <!-- TODO (candidato): completar con tu experiencia real -->
@@ -108,9 +144,6 @@ resolvieron:
   `.env.example` y `.env.development`.
 - El primer commit del frontend no tiene pruebas, por lo que se usó `passWithNoTests`
   temporalmente (se quitó en el commit siguiente).
-- El servidor MCP de Playwright no pudo arrancar (no hay Chrome del sistema en
-  `/opt/google/chrome`); las comprobaciones de interfaz se hicieron con `playwright-core` y
-  el Chromium headless en caché.
 - `docker compose --profile app down` también elimina PostgreSQL y LocalStack; se detuvo
   la infraestructura sin querer durante la verificación y se volvió a levantar con
   `docker compose up -d --wait` (los volúmenes se conservan).
@@ -118,17 +151,15 @@ resolvieron:
   interfaz de red; el criterio de la lista de humo se interpretó como "la API escucha en el
   puerto 4000".
 - Ctrl+C al worker durante el long polling tardó unos 21 s, algo por encima de los 20 s que
-  fija la lista de humo.
+  fija la lista de humo (corregido después: ver B3).
 - En la prueba de la DLQ, el upload pasa a `FAILED` en el momento del tercer intento, pero
   el mensaje solo aparece en `file-processing-dlq` unos 60 s después (cuando vence el
   visibility timeout de la tercera recepción).
 - La imagen `minlag/mermaid-cli` más reciente rechaza la opción `-w` del comando de la
   especificación; el diagrama de arquitectura en dirección `LR` salía demasiado ancho para
   leerse y se pasó a `TB`.
-- Hallazgos no bloqueantes de la revisión nativa que no se corrigieron: ver README
-  "Limitaciones conocidas" (upload en `PROCESSING` tras un crash, sin heartbeat de
-  visibilidad, archivo huérfano en S3 si falla la creación del registro, confianza en el
-  tamaño declarado, parámetro `page` negativo y archivo previo tras cancelar el diálogo).
+- Los hallazgos no bloqueantes de las revisiones automáticas que no se corrigieron están
+  en el README, en "Limitaciones conocidas".
 - El workflow de CI no se ha ejecutado en GitHub (el repositorio no tiene remoto): se
   validó con `actionlint` y reproduciendo cada job en local. Las versiones `@v7` de las
   actions no se pudieron comprobar.
@@ -166,20 +197,18 @@ con un cronómetro; solo se comprobó que el polling del detalle ocurre cada 3 s
 | `USO-DE-IA.md` con los dos marcadores pendientes del candidato | `rg` | Cumple |
 | `docs/arquitectura-aws.png`, `docs/arquitectura-aws.md`, `docs/flujo.md` | `stat`, lectura de la imagen y render de `flujo.md` con `mermaid-cli` | El PNG pesa 242 915 bytes y se ve legible; ambos diagramas se renderizan |
 | `sample-data.csv` | `rg -c ""` | 61 líneas (cabecera y 60 filas) |
-| Pruebas en el clon | `npm run test:unit`, `test:integration`, `test:coverage`, frontend `npm test` | 161 unitarias (22 archivos), 33 de integración (3 archivos), 20 del frontend; cobertura de líneas global 85,37 % |
+| Pruebas en el clon | `npm run test:unit`, `test:integration`, `test:coverage`, frontend `npm test` | 161 unitarias (22 archivos), 33 de integración (3 archivos), 20 del frontend; cobertura de líneas global 85,37 % (cifras de la capa 10; ver README para las actuales) |
 
 ## Qué haría con más tiempo
 
 - Publicar el repositorio y ejecutar el workflow de CI en GitHub; verificar las versiones
   de las actions.
-- Pruebas automáticas de los adaptadores de S3 y SQS (por ejemplo con LocalStack en CI).
 - Un consumidor de la DLQ que marque como `FAILED` los uploads que queden en `PROCESSING`.
 - Heartbeat de visibilidad con `ChangeMessageVisibility` para archivos largos con varios
   workers.
 - Limpieza compensatoria del objeto de S3 si falla la creación del registro.
-- Verificar el tamaño real del archivo almacenado en lugar de confiar en el declarado.
-- Normalizar el parámetro `page` negativo y limpiar el archivo seleccionado al cancelar el
-  diálogo.
+- Pruebas unitarias de los adaptadores de S3 y SQS (hoy solo las cubren las pruebas E2E).
+- Versión optimista en `Upload` y camino de operador para reprocesar uploads en `FAILED`.
 - Autenticación y multiusuario.
 
 ## Tiempo invertido

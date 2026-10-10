@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { ExponentialBackoff } from './ExponentialBackoff.js';
+import { describe, expect, it, vi } from 'vitest';
+import { ExponentialBackoff, sleep } from './ExponentialBackoff.js';
 
 describe('ExponentialBackoff', () => {
   const options = { baseMs: 1000, factor: 2, maxMs: 30000 };
@@ -42,5 +42,33 @@ describe('ExponentialBackoff', () => {
 
     expect(backoff.attempt).toBe(0);
     expect(backoff.nextDelayMs()).toBe(500);
+  });
+});
+
+describe('sleep', () => {
+  it('sleep resolves early on abort', async () => {
+    vi.useFakeTimers();
+    try {
+      const controller = new AbortController();
+      const sleeping = sleep(30000, controller.signal);
+      expect(vi.getTimerCount()).toBe(1);
+
+      controller.abort();
+
+      await expect(sleeping).resolves.toBeUndefined();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('resolves immediately when the signal is already aborted', async () => {
+    vi.useFakeTimers();
+    try {
+      await expect(sleep(30000, AbortSignal.abort())).resolves.toBeUndefined();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -12,9 +12,15 @@ const cases: Array<[UploadStatusValue, string, string]> = [
 
 describe('StatusBadge', () => {
   it.each(cases)('renders Spanish label and color class per status (%s)', (status, label, classes) => {
-    render(<StatusBadge status={status} />);
+    render(<StatusBadge status={status} announce />);
     const badge = screen.getByRole('status');
     expect(badge).toHaveTextContent(label);
     for (const className of classes.split(' ')) expect(badge).toHaveClass(className);
+  });
+
+  it('is not a live region by default, so table rows do not announce every refresh', () => {
+    render(<StatusBadge status="COMPLETED" />);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByText('Completado')).toBeInTheDocument();
   });
 });

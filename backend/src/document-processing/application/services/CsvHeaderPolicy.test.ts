@@ -43,4 +43,11 @@ describe('CsvHeaderPolicy', () => {
       message: 'Invalid CSV header: missing [category, amount, unit, date]',
     });
   });
+
+  it('renders an empty column name as "" instead of an empty slot', () => {
+    const result = validateHeader(['category', 'amount', 'unit', 'date', '']);
+    expect(result.value).toMatchObject({
+      message: 'Invalid CSV header: unexpected [""]',
+    });
+  });
 });

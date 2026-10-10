@@ -78,7 +78,9 @@ docker compose --profile app rm -f api worker frontend migrate
 (los volúmenes se conservan).
 
 `NEXT_PUBLIC_API_URL` se incrusta en el frontend en tiempo de build y apunta a
-`http://localhost:4000/api/v1`, porque es el navegador (en el host) quien llama a la API.
+`http://localhost:4000/api/v1`, porque es el navegador (en el host) quien llama a la API. Como queda fijado en la imagen,
+cambiarla exige reconstruirla (`--build`, o `--build-arg NEXT_PUBLIC_API_URL=...`); reiniciar
+el contenedor no basta.
 
 ### Variables de entorno
 
@@ -96,7 +98,7 @@ sin secretos reales. El archivo `.env` (no versionado) puede sobrescribirlos.
 | `DATABASE_URL` | (obligatoria) | Conexión a PostgreSQL |
 | `AWS_REGION` | `us-east-1` | Región AWS |
 | `AWS_ENDPOINT` | vacío | Endpoint de AWS; en local, LocalStack (`http://localhost:4566`) |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | `test` / `test` | Credenciales (LocalStack acepta cualquier valor) |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | vacío / vacío | Credenciales estáticas, opcionales y todo-o-nada (ambas o ninguna; si solo una está definida la configuración falla). En local, LocalStack acepta cualquier valor (`test` / `test`). En AWS déjalas vacías para usar el rol IAM de la tarea |
 | `S3_BUCKET` | `document-processing` | Bucket de los CSV |
 | `S3_FORCE_PATH_STYLE` | `true` | Necesario para LocalStack |
 | `SQS_QUEUE_URL` | (obligatoria) | URL de la cola `file-processing` |
@@ -315,6 +317,16 @@ carbonbox-challenge/
 - **Convict** valida la configuración al arrancar y falla rápido; **zod** valida la
   entrada de transporte en los controllers; **Vitest** para pruebas unitarias y de
   integración.
+- **Credenciales de AWS.** En local se usan claves estáticas (`AWS_ACCESS_KEY_ID` /
+  `AWS_SECRET_ACCESS_KEY`, `test` / `test` en LocalStack). En AWS se dejan vacías y el SDK
+  usa la cadena de credenciales por defecto (el rol IAM de la tarea), sin secretos en la
+  configuración. Las dos claves son todo-o-nada: definir solo una hace fallar el arranque.
+- **Paginación determinista.** El listado de uploads se ordena por `createdAt` descendente
+  con `id` descendente como desempate, para que dos uploads con la misma marca de tiempo no
+  salten ni se repitan entre páginas.
+- **Parada ordenada.** El long polling y la espera del backoff del worker se pueden
+  cancelar, y Compose define `stop_grace_period`; así `docker compose stop` termina el
+  worker en menos de un segundo en lugar de esperar la recepción en curso.
 - **Sin retrasos artificiales.** El código de producción no tiene `sleep` para hacer
   visible `PROCESSING`; para observarlo se usa el archivo grande de `samples/`.
 
@@ -328,33 +340,66 @@ Estado real de lo que no está completo o no se pudo comprobar:
   (`actions/checkout@v7`, `actions/setup-node@v7`) no se han podido verificar contra
   GitHub. El badge y el enlace a la ejecución quedan como marcador (`TODO (candidato)`)
   para cuando se publique.
-- **Adaptadores AWS sin pruebas automáticas.** `S3FileStorage`, `SqsMessagePublisher` y
-  `SqsMessageConsumer` solo se verifican con la lista de humo manual contra LocalStack
-  (sección "Cómo probarlo"); el job de CI solo levanta PostgreSQL.
+- **Adaptadores AWS sin pruebas unitarias.** `S3FileStorage`, `SqsMessagePublisher` y
+  `SqsMessageConsumer` no tienen pruebas unitarias. Los ejercitan las pruebas E2E (job
+  `e2e` de CI, que levanta el stack completo con LocalStack) y la lista de humo manual; la
+  ruta de apagado del consumidor SQS (cancelar el long polling) solo se cubre con la prueba
+  manual de `docker compose stop worker`. Futuro: `aws-sdk-client-mock`.
 - **Un solo usuario, sin autenticación** (`DEFAULT_USER_ID=user-123`), como permite el
   enunciado.
+- **Varios workers pueden reprocesar el mismo upload.** No hay versión optimista ni
+  heartbeat de visibilidad: con varios workers, un archivo que tarde más que el visibility
+  timeout más el retraso de reintento puede procesarse dos veces, y un guardado tardío del
+  estado `PROCESSING` podría pisar un `COMPLETED`. `deleteByUploadId` y
+  `@@unique([uploadId, rowNumber])` mantienen los datos correctos, pero el trabajo se
+  repite. Solución prevista: columna `version` con actualización condicional y heartbeat con
+  `ChangeMessageVisibility`.
+- **Un mensaje reenviado desde la DLQ se descarta.** Tras la tercera recepción el upload ya
+  está en `FAILED` (estado terminal), así que reenviar el mensaje desde la DLQ no lo
+  reprocesa. Camino de operador hoy: devolver el upload a `PENDING` con SQL manual antes del
+  redrive. Futuro: un consumidor de DLQ o un endpoint de administración.
+- **`WORKER_MAX_RECEIVE_COUNT` debe coincidir con la cola.** El valor (3) tiene que ser
+  igual al `maxReceiveCount` de la `RedrivePolicy` de la cola (`infra/localstack/init-aws.sh`).
+  Si el worker usa un valor mayor, SQS mueve el mensaje a la DLQ antes de que el upload se
+  marque `FAILED` y puede quedar en `PROCESSING`. No se valida al arrancar.
 - **Upload en `PROCESSING` tras un crash en la tercera recepción.** Si el worker muere en
   la tercera recepción de un mensaje, el upload puede quedar en `PROCESSING` con su mensaje
   en la DLQ. La recuperación es un redrive manual o un consumidor de DLQ futuro que lo
   marque `FAILED`.
-- **Sin heartbeat de visibilidad.** Con varios workers, un archivo que tarde más que el
-  visibility timeout más el retraso de reintento podría procesarse dos veces;
-  `deleteByUploadId` y `@@unique([uploadId, rowNumber])` lo hacen seguro pero costoso. El
-  heartbeat con `ChangeMessageVisibility` queda como trabajo futuro.
 - **Archivo huérfano en S3.** Si la creación del registro falla después de subir el
-  archivo, el objeto queda en S3 sin registro (no hay limpieza compensatoria).
-- **Tamaño declarado.** La aplicación confía en el tamaño declarado del archivo (hallazgo
-  de la revisión de la capa de aplicación, sin corregir).
-- **Apagado del worker.** Con `npm run worker`, Ctrl+C durante el long polling tarda
-  aproximadamente lo que dura la espera de la recepción en curso (medido: unos 21 s con
-  `WORKER_WAIT_TIME_SECONDS=20`, algo por encima de los 20 s esperados por la lista de
-  humo). `npm run worker` informa código de salida 130 cuando se interrumpe el grupo de
-  procesos, aunque el proceso de node termina con 0.
-- **Frontend: seguimientos menores de la revisión.** Un parámetro `page` negativo en la URL
-  del listado no se normaliza, y al cancelar el diálogo de selección de archivo puede
-  quedar seleccionado el archivo anterior.
+  archivo, el objeto queda en S3 sin registro (no hay limpieza compensatoria). Futuro:
+  outbox transaccional y reglas de ciclo de vida de S3.
+- **Número de fila en los errores.** El campo `row` de cada error es el índice del registro
+  de datos (sin contar la cabecera y saltando las líneas en blanco), no el número de línea
+  físico del archivo.
+- **Mensajes en inglés.** Los mensajes de la API y de los errores (por ejemplo
+  `Invalid CSV header: missing [date]`) están en inglés a propósito, como parte del
+  contrato de la API; la interfaz los muestra tal cual, dentro de una UI en español.
+- **Texto adicional en la subida.** Si junto al archivo válido se envía un campo de texto
+  extra en el multipart, se ignora (no se rechaza).
+- **Apagado.** Con `docker compose stop` el worker termina en menos de un segundo (medido:
+  0,3 s, código de salida 0), porque la espera de la recepción en curso se cancela; los
+  servicios tienen `stop_grace_period` (30 s el worker, 15 s la API). La API no tiene un
+  tiempo máximo propio de cierre. `npm run worker` informa código de salida 130 cuando se
+  interrumpe el grupo de procesos, aunque el proceso de node termina con 0.
+- **Auditoría de dependencias.** `npm audit` (ejecutado sin aplicar correcciones):
+  - Frontend: `npm audit --omit=dev` encuentra 0 vulnerabilidades; `npm audit` completo
+    encuentra 5 de severidad alta (`braces`, `micromatch`, `fast-glob`,
+    `@next/eslint-plugin-next`, `eslint-config-next`), todas de desarrollo (la cadena de
+    ESLint del scaffold), sin llegar al runtime.
+  - Backend: `npm audit --omit=dev` y `npm audit` coinciden: 8 de severidad alta. La
+    cadena `awilix` → `fast-glob` → `micromatch` → `braces` (denegación de servicio por
+    patrones anidados) es de producción, pero la aplicación no pasa entrada de usuario a
+    esas librerías. `prisma` (declarado como dependencia de desarrollo; npm lo cuenta por
+    el cliente) arrastra `mysql2` y `deepmerge-ts`; `mysql2` no se usa porque la aplicación
+    solo habla con PostgreSQL. La corrección que propone npm es un cambio mayor
+    (`prisma@6`) y no se aplicó.
 - **Dockerfile del frontend sin `public/`.** El scaffold no tiene carpeta `public`, por lo
-  que el Dockerfile no copia ese directorio (la spec incluía esa copia, que fallaría porque la carpeta no existe).
+  que el Dockerfile no copia ese directorio.
+- **No incluido en esta entrega** (sin impacto de usuario): eliminar el índice
+  `@@index([uploadId])`, redundante con el `@@unique`; normalizar `Amount`; limitar el rango
+  de años de `ActivityDate`; un endpoint `/ready`; políticas `restart` en Compose y fijar
+  imágenes por digest.
 - **`docker compose --profile app down`** elimina también PostgreSQL y LocalStack; se
   documenta `stop` + `rm` para bajar solo la aplicación.
 - **`next dev` genera `frontend/AGENTS.md`** (Next.js 16.4); se añadió a
@@ -364,10 +409,6 @@ Estado real de lo que no está completo o no se pudo comprobar:
   funciona desde el host.
 - **Observabilidad del arranque.** El log de la API lista cada interfaz de red
   (`Server listening at http://<ip>:4000`) en lugar de una sola línea `0.0.0.0`.
-- **Navegador de pruebas.** Las pruebas manuales del frontend se hicieron con Chromium
-  headless controlado con `playwright-core`; el servidor MCP de Playwright no pudo
-  arrancar (no hay Chrome del sistema). El comportamiento de la interfaz no se
-  verificó con un navegador de escritorio.
 
 ## Cómo probarlo
 
@@ -421,7 +462,7 @@ Resultados de la lista de humo ejecutada una vez contra LocalStack:
 |------|---------------|---------------------|
 | 8 | Detener el worker, subir `sample-data.csv` con curl, borrar el objeto en S3 (`docker compose exec localstack awslocal s3 rm s3://document-processing/uploads/<id>/sample-data.csv`) y arrancar el worker | El worker registró `Processing failed, will retry` con `retryInSeconds` 16 y luego 32, y después `Message dead-lettered`. El upload quedó `FAILED` con `Processing failed after 3 attempts: Could not download ...` (unos 50 s tras arrancar el worker). El mensaje apareció en `file-processing-dlq` unos 60 s después (el visibility timeout de la tercera recepción) |
 | 9 | Detener LocalStack con el worker en marcha | El worker registró `Receive failed, backing off` con `delayMs` creciente (885, 1777, 3430, 7303, 13772, 18372). Al reiniciar LocalStack volvió a procesar sin reiniciar el worker (un upload nuevo quedó `COMPLETED`) |
-| 10 | Ctrl+C al worker durante el long polling | Registró `Shutting down worker` (señal `SIGINT`) y terminó tras unos 21 s |
+| 10 | Ctrl+C al worker durante el long polling | Registró `Shutting down worker` (señal `SIGINT`) y terminó tras unos 21 s (medición anterior a cancelar la espera al apagar; ahora `docker compose stop worker` tarda 0,3 s) |
 
 Para reproducir el paso 8, el mensaje se mira con:
 
@@ -462,14 +503,14 @@ Los errores tienen la forma `{"error":{"code","message","details?"},"requestId"}
 
 | Suite | Comando | Resultado verificado |
 |-------|---------|----------------------|
-| Backend, todo | `cd backend && npm test` | 194 pruebas en 25 archivos |
-| Backend, unitarias | `npm run test:unit` | 161 pruebas en 22 archivos; sin infraestructura |
-| Backend, integración | `npm run test:integration` | 33 pruebas en 3 archivos; necesitan PostgreSQL (`docker compose up -d`); usan una base `document_processing_test` y no tocan S3 ni SQS |
-| Frontend | `cd frontend && npm test` | 20 pruebas en 6 archivos |
-| Cobertura | `npm run test:coverage` | líneas: dominio 99,53 %, aplicación 99,23 %, global 85,37 % |
+| Backend, todo | `cd backend && npm test` | 220 pruebas en 27 archivos |
+| Backend, unitarias | `npm run test:unit` | 181 pruebas en 23 archivos; sin infraestructura |
+| Backend, integración | `npm run test:integration` | 39 pruebas en 4 archivos; necesitan PostgreSQL (`docker compose up -d`); usan una base `document_processing_test` y no tocan S3 ni SQS |
+| Frontend | `cd frontend && npm test` | 44 pruebas en 9 archivos |
+| Cobertura | `npm run test:coverage` | líneas: global 85,84 % |
 
 Las pruebas se escribieron antes que el código en cada capa. Los adaptadores de S3 y SQS no
-tienen pruebas automáticas (ver "Limitaciones conocidas").
+tienen pruebas unitarias (ver "Limitaciones conocidas").
 
 ### Pruebas E2E
 
@@ -490,7 +531,12 @@ existan en la base. Cubren: el CSV válido (`sample-data.csv`, 60 filas) hasta
 "Completado" y su aparición en la lista; `samples/sample-with-errors.csv` (19 filas
 válidas, 6 con error, errores por fila visibles); `samples/invalid-header.csv`
 ("Fallido" con `Invalid CSV header: missing [date]`); y el rechazo en el cliente de un
-archivo que no es `.csv`. En fallo se genera `e2e/playwright-report/`.
+archivo que no es `.csv`. El informe HTML se genera siempre en `e2e/playwright-report/`;
+CI solo lo sube como artefacto cuando las pruebas fallan.
+
+Estas cuatro pruebas son la evidencia automática del comportamiento de la interfaz en
+Chromium. Antes de la entrega, el candidato la verifica además a mano en un navegador de
+escritorio.
 
 CI: el workflow `.github/workflows/ci.yml` define un job `backend` (generate, lint,
 typecheck, unitarias, integración con PostgreSQL, build) un job `frontend` (lint,

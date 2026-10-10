@@ -143,4 +143,48 @@ describe('CsvParseCsvParser', () => {
 
     await expect(parser.countDataRows(failing)).rejects.toThrow('socket reset');
   });
+
+  describe('source stream release', () => {
+    // Chunks arrive on separate ticks so the source is still open when parsing stops early.
+    function chunkedSource(header: string, rows: number): Readable {
+      async function* chunks(): AsyncGenerator<Buffer> {
+        yield Buffer.from(`${header}\n`, 'utf8');
+        for (let i = 0; i < rows; i += 1) {
+          await new Promise((resolve) => setImmediate(resolve));
+          yield Buffer.from('energy,10,kWh,2026-01-15\n', 'utf8');
+        }
+      }
+      return Readable.from(chunks());
+    }
+
+    it('destroys the source stream after an invalid header', async () => {
+      const source = chunkedSource('category,amount,unit', 50);
+
+      const result = await parser.countDataRows(source);
+
+      expect(result.isLeft()).toBe(true);
+      expect(source.destroyed).toBe(true);
+    });
+
+    it('destroys the source stream when onRecord throws', async () => {
+      const source = chunkedSource(HEADER, 50);
+
+      await expect(
+        parser.parse(source, (_record, rowNumber) =>
+          rowNumber === 2 ? Promise.reject(new Error('db down')) : Promise.resolve(),
+        ),
+      ).rejects.toThrow('db down');
+
+      expect(source.destroyed).toBe(true);
+    });
+
+    it('destroys the source stream after a successful parse', async () => {
+      const source = chunkedSource(HEADER, 3);
+
+      const result = await parser.countDataRows(source);
+
+      expect(result.isRight() && result.value).toBe(3);
+      expect(source.destroyed).toBe(true);
+    });
+  });
 });

@@ -19,7 +19,21 @@ export function UploadList({ page }: { page: number }) {
       {isPending ? <LoadingSpinner /> : null}
       {isError ? <ErrorAlert message={getApiErrorMessage(error)} onRetry={() => void refetch()} /> : null}
 
-      {data && data.data.length === 0 ? <p className="text-slate-600">Todavía no hay uploads.</p> : null}
+      {data && data.data.length === 0 && data.total === 0 ? (
+        <p className="text-slate-600">Todavía no hay uploads.</p>
+      ) : null}
+
+      {data && data.data.length === 0 && data.total > 0 ? (
+        <div className="space-y-2">
+          <p className="text-slate-600">No hay uploads en esta página.</p>
+          <Link
+            href="/uploads?page=1"
+            className="rounded font-medium text-emerald-800 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+          >
+            Volver a la primera página
+          </Link>
+        </div>
+      ) : null}
 
       {data && data.data.length > 0 ? (
         <>

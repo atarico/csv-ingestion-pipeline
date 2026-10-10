@@ -1,15 +1,17 @@
 import * as z from 'zod';
 import type { FieldError } from '../../../shared/domain/DomainError.js';
 
+const pageSchema = z.coerce.number().int().min(1).max(100000).default(1);
+
 export const UploadIdParamsSchema = z.object({ id: z.uuid() });
 
 export const ListUploadsQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageSchema,
   limit: z.coerce.number().int().min(1).max(100).default(10),
 });
 
 export const UploadResultsQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageSchema,
   limit: z.coerce.number().int().min(1).max(500).default(100),
 });
 

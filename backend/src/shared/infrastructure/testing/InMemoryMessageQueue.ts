@@ -35,6 +35,7 @@ export class InMemoryMessageQueue implements IMessagePublisher, IMessageConsumer
     return Promise.resolve(Either.right(undefined));
   }
 
+  /** Takes no abort signal: the in-memory queue never blocks, so it always returns at once. */
   receive(): Promise<ReceivedMessage[]> {
     if (this.failNextReceive) {
       this.failNextReceive = false;

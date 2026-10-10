@@ -222,6 +222,40 @@ describe('FileProcessingWorker', () => {
 
     await worker.processOnce();
 
-    expect(sleep).toHaveBeenCalledWith(500);
+    expect(sleep).toHaveBeenCalledWith(500, expect.any(AbortSignal));
+  });
+
+  it('stop aborts a backoff sleep', async () => {
+    vi.useFakeTimers();
+    try {
+      delete policy.sleep;
+      worker = build();
+      queue.failNextReceive = true;
+      const started = worker.start();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vi.getTimerCount()).toBe(1);
+
+      worker.stop();
+
+      await expect(started).resolves.toBeUndefined();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stop aborts an in-progress receive', async () => {
+    vi.spyOn(queue, 'receive').mockImplementation(
+      (signal?: AbortSignal) =>
+        new Promise<ReceivedMessage[]>((resolve) => {
+          signal?.addEventListener('abort', () => resolve([]), { once: true });
+        }),
+    );
+    const started = worker.start();
+    await Promise.resolve();
+
+    worker.stop();
+
+    await expect(started).resolves.toBeUndefined();
   });
 });
