@@ -18,6 +18,7 @@ import { createPrismaClient } from '../document-processing/infrastructure/persis
 import { S3FileStorage } from '../document-processing/infrastructure/storage/S3FileStorage.js';
 import { createS3Client, createSqsClient } from '../shared/infrastructure/aws/AwsClientsFactory.js';
 import { createLogger } from '../shared/infrastructure/logging/createLogger.js';
+import type { WorkerPolicy } from '../workers/WorkerPolicy.js';
 
 export function createAppContainer(config: AppConfig): AwilixContainer {
   const container = createContainer({ injectionMode: InjectionMode.CLASSIC, strict: true });
@@ -31,6 +32,13 @@ export function createAppContainer(config: AppConfig): AwilixContainer {
       waitTimeSeconds: config.worker.waitTimeSeconds,
       visibilityTimeoutSeconds: config.worker.visibilityTimeoutSeconds,
       maxMessages: config.worker.maxMessages,
+    }),
+    workerPolicy: asValue<WorkerPolicy>({
+      maxReceiveCount: config.worker.maxReceiveCount,
+      pollBackoffMaxMs: config.worker.pollBackoffMaxMs,
+      retryBackoffBaseSeconds: config.worker.retryBackoffBaseSeconds,
+      retryBackoffMaxSeconds: config.worker.retryBackoffMaxSeconds,
+      sqsQueueUrl: config.aws.sqsQueueUrl,
     }),
     logger: asValue(createLogger(config.logLevel, config.env)),
     prismaClient: asFunction(() => createPrismaClient(config.databaseUrl))
