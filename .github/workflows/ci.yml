@@ -81,6 +81,7 @@ jobs:
         run: docker compose --profile app up -d --build --wait
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - run: npm run typecheck
       - run: npm test
         env:
           CI: "true"
