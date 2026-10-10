@@ -160,9 +160,9 @@ resolvieron:
   leerse y se pasó a `TB`.
 - Los hallazgos no bloqueantes de las revisiones automáticas que no se corrigieron están
   en el README, en "Limitaciones conocidas".
-- El workflow de CI no se ha ejecutado en GitHub (el repositorio no tiene remoto): se
-  validó con `actionlint` y reproduciendo cada job en local. Las versiones `@v7` de las
-  actions no se pudieron comprobar.
+- Hasta publicar el repositorio, el workflow de CI solo se validó con `actionlint` y
+  reproduciendo cada job en local. La primera ejecución en GitHub (2026-10-10) fue verde en
+  los jobs `backend`, `frontend` y `e2e`, lo que confirmó las versiones `@v7` de las actions.
 
 ### Lista de humo manual (ejecutada una vez, en la capa 10)
 
@@ -192,17 +192,14 @@ con un cronómetro; solo se comprobó que el polling del detalle ocurre cada 3 s
 | `sample-with-errors.csv` | Chromium headless | `Completado`, `failedRows 6`, tabla con las filas 3, 7, 11, 15, 19 y 23 |
 | `invalid-header.csv` | Chromium headless | `Fallido`, `Invalid CSV header: missing [date]` |
 | `docker compose --profile app up --build` en el clon | curl y Chromium headless | `/health` devuelve `{"status":"ok"}`, el frontend responde y el flujo completo (muestra, errores, cabecera inválida y archivo grande) funciona contra los contenedores |
-| CI verde en `main` e insignia | No se pudo comprobar | El repositorio no tiene remoto; el workflow no se ejecutó en GitHub (ver README "Limitaciones conocidas") |
+| CI verde en `main` e insignia | Ejecución de CI en GitHub | En la capa 10 no se pudo comprobar (sin remoto). Tras publicar, la primera ejecución (2026-10-10) fue verde: [ejecución 38084387707](https://github.com/atarico/csv-ingestion-pipeline/actions/runs/38084387707). |
 | `git log` con commits convencionales y sin trailers de atribución; sin `.env` versionado | `git log`, `git ls-files` | Cumple |
-| `USO-DE-IA.md` con los dos marcadores pendientes del candidato | `rg` | Cumple |
 | `docs/arquitectura-aws.png`, `docs/arquitectura-aws.md`, `docs/flujo.md` | `stat`, lectura de la imagen y render de `flujo.md` con `mermaid-cli` | El PNG pesa 242 915 bytes y se ve legible; ambos diagramas se renderizan |
 | `sample-data.csv` | `rg -c ""` | 61 líneas (cabecera y 60 filas) |
 | Pruebas en el clon | `npm run test:unit`, `test:integration`, `test:coverage`, frontend `npm test` | 161 unitarias (22 archivos), 33 de integración (3 archivos), 20 del frontend; cobertura de líneas global 85,37 % (cifras de la capa 10; ver README para las actuales) |
 
 ## Qué haría con más tiempo
 
-- Publicar el repositorio y ejecutar el workflow de CI en GitHub; verificar las versiones
-  de las actions.
 - Un consumidor de la DLQ que marque como `FAILED` los uploads que queden en `PROCESSING`.
 - Heartbeat de visibilidad con `ChangeMessageVisibility` para archivos largos con varios
   workers.

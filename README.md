@@ -1,8 +1,6 @@
 # CarbonBox · Procesamiento asíncrono de documentos
 
-<!-- TODO (candidato): al publicar el repositorio en GitHub, reemplazar esta línea por el badge de CI:
-[![CI](https://github.com/<usuario>/<repositorio>/actions/workflows/ci.yml/badge.svg)](https://github.com/<usuario>/<repositorio>/actions/workflows/ci.yml)
-Mientras el repositorio no se publique, el workflow no se ha ejecutado en GitHub (ver "Limitaciones conocidas"). -->
+[![CI](https://github.com/atarico/csv-ingestion-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/atarico/csv-ingestion-pipeline/actions/workflows/ci.yml)
 
 ## Descripción del proyecto
 
@@ -87,7 +85,8 @@ el contenedor no basta.
 La API y el worker leen la configuración con Convict (validada al arrancar). Hay un
 archivo por entorno en `backend/`: `.env.example` (plantilla), `.env.development`,
 `.env.test` y `.env.docker` (usado por el perfil `app` de Compose). Son valores locales,
-sin secretos reales. El archivo `.env` (no versionado) puede sobrescribirlos.
+sin secretos reales. El archivo `.env` (no versionado) solo aporta variables que no estén
+ya definidas; las variables del proceso tienen prioridad sobre ambos archivos.
 
 | Variable | Default | Descripción |
 |----------|---------|-------------|
@@ -334,12 +333,6 @@ carbonbox-challenge/
 
 Estado real de lo que no está completo o no se pudo comprobar:
 
-- **CI sin ejecutar en GitHub.** El repositorio no tiene remoto y no se ha publicado, así
-  que `.github/workflows/ci.yml` nunca se ha ejecutado en GitHub. Se validó en local con
-  `actionlint` y reproduciendo cada job por separado. Las versiones de las actions
-  (`actions/checkout@v7`, `actions/setup-node@v7`) no se han podido verificar contra
-  GitHub. El badge y el enlace a la ejecución quedan como marcador (`TODO (candidato)`)
-  para cuando se publique.
 - **Adaptadores AWS sin pruebas unitarias.** `S3FileStorage`, `SqsMessagePublisher` y
   `SqsMessageConsumer` no tienen pruebas unitarias. Los ejercitan las pruebas E2E (job
   `e2e` de CI, que levanta el stack completo con LocalStack) y la lista de humo manual; la
@@ -349,8 +342,8 @@ Estado real de lo que no está completo o no se pudo comprobar:
   enunciado.
 - **Varios workers pueden reprocesar el mismo upload.** No hay versión optimista ni
   heartbeat de visibilidad: con varios workers, un archivo que tarde más que el visibility
-  timeout más el retraso de reintento puede procesarse dos veces, y un guardado tardío del
-  estado `PROCESSING` podría pisar un `COMPLETED`. `deleteByUploadId` y
+  timeout (60 s) vuelve a ser visible y otro worker puede recibirlo, con lo que se procesa
+  dos veces, y un guardado tardío del estado `PROCESSING` podría pisar un `COMPLETED`. `deleteByUploadId` y
   `@@unique([uploadId, rowNumber])` mantienen los datos correctos, pero el trabajo se
   repite. Solución prevista: columna `version` con actualización condicional y heartbeat con
   `ChangeMessageVisibility`.
@@ -539,9 +532,10 @@ Chromium. Antes de la entrega, el candidato la verifica además a mano en un nav
 escritorio.
 
 CI: el workflow `.github/workflows/ci.yml` define un job `backend` (generate, lint,
-typecheck, unitarias, integración con PostgreSQL, build) un job `frontend` (lint,
-typecheck, pruebas, build) y un job `e2e` (levanta el stack con Compose y ejecuta Playwright). <!-- TODO (candidato): al publicar el repositorio, enlazar aquí la primera ejecución verde de CI. --> Todavía no se ha ejecutado en GitHub; se
-validó en local con `actionlint` y reproduciendo cada job.
+typecheck, unitarias, integración con PostgreSQL, build), un job `frontend` (lint,
+typecheck, pruebas, build) y un job `e2e` (levanta el stack con Compose y ejecuta Playwright).
+La primera ejecución en GitHub Actions sobre `main` terminó en verde en los tres jobs:
+[ejecución 38084387707](https://github.com/atarico/csv-ingestion-pipeline/actions/runs/38084387707).
 
 ## Diagrama de infraestructura AWS
 
