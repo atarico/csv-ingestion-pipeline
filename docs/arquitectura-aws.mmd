@@ -39,14 +39,12 @@ graph TB
     api -->|SQL 5432| rds
     api -->|PutObject| s3
     api -->|SendMessage| sqs
-    sqs -->|ReceiveMessage| worker
+    worker -->|ReceiveMessage, DeleteMessage, ChangeMessageVisibility| sqs
     sqs -->|redrive tras 3 recepciones| dlq
     worker -->|GetObject| s3
     worker -->|SQL 5432| rds
-    sm -.->|secretos inyectados en las definiciones de tarea| ecs
-    fe -.->|logs| cw
-    api -.->|logs| cw
-    worker -.->|logs| cw
+    ecs -.->|secretos inyectados en las definiciones de tarea| sm
+    ecs -.->|logs| cw
     dlq -.->|alarma con profundidad mayor que 0| cw
     ecs -.-> vpce
     ecs -.->|resto del tráfico saliente| nat
