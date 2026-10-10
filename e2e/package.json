@@ -1,0 +1,16 @@
+{
+  "name": "carbonbox-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Black-box browser tests for the CarbonBox CSV upload system",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3"
+  }
+}
