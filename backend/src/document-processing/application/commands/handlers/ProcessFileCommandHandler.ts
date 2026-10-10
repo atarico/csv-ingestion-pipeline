@@ -119,6 +119,8 @@ export class ProcessFileCommandHandler implements ICommandHandler<
 
     if (parsed.isLeft()) {
       // Malformed body after a valid header: the unflushed batch is discarded.
+      // The real adapter reads the whole file in pass 1, so this branch is defensive;
+      // it is reachable only with a parser that fails mid-stream.
       return this.finishFailed(
         upload,
         parsed.value.message,

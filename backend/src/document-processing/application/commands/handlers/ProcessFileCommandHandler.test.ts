@@ -1,16 +1,19 @@
 import pino from 'pino';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  CsvFormatError,
   InvalidStateTransitionError,
   NotFoundError,
   StorageError,
 } from '../../../../shared/domain/DomainError.js';
+import { Either } from '../../../../shared/domain/Either.js';
 import { InMemoryActivityDataRepository } from '../../../../shared/infrastructure/testing/InMemoryActivityDataRepository.js';
 import { InMemoryFileStorage } from '../../../../shared/infrastructure/testing/InMemoryFileStorage.js';
 import { InMemoryUploadRepository } from '../../../../shared/infrastructure/testing/InMemoryUploadRepository.js';
 import { ActivityData } from '../../../domain/entities/ActivityData.js';
 import { Upload } from '../../../domain/entities/Upload.js';
 import { FileName } from '../../../domain/value-objects/FileName.js';
+import type { ICsvParser } from '../../ports/ICsvParser.js';
 import { CsvParseCsvParser } from '../../../infrastructure/csv/CsvParseCsvParser.js';
 import { ProcessFileCommandHandler } from './ProcessFileCommandHandler.js';
 
@@ -193,6 +196,54 @@ describe('ProcessFileCommandHandler', () => {
     expect(result.value).toBeInstanceOf(StorageError);
     const stored = await persisted(upload);
     expect(stored.status.value).toBe('PENDING');
+  });
+
+  it('keeps the upload PROCESSING when the second download fails', async () => {
+    const upload = await seedUpload(csv(VALID_ROW, VALID_ROW, VALID_ROW));
+    fileStorage.failDownloadAt = 2;
+
+    const result = await run(upload);
+
+    expect(result.value).toBeInstanceOf(StorageError);
+    const stored = await persisted(upload);
+    expect(stored.status.value).toBe('PROCESSING');
+    expect(stored.totalRows).toBe(3);
+    expect(activityDataRepository.rows).toHaveLength(0);
+  });
+
+  it('fails with saved counts when the parser fails after a valid header', async () => {
+    const upload = await seedUpload(csv(VALID_ROW));
+    const failingParser: ICsvParser = {
+      countDataRows: () => Promise.resolve(Either.right(3)),
+      parse: async (_stream, onRecord) => {
+        await onRecord({ category: 'energy', amount: '1', unit: 'kWh', date: '2026-01-15' }, 1);
+        await onRecord({ category: 'energy', amount: '2', unit: 'kWh', date: '2026-01-16' }, 2);
+        return Either.left(new CsvFormatError('Malformed quoted field at line 4'));
+      },
+    };
+    handler = new ProcessFileCommandHandler(
+      uploadRepository,
+      activityDataRepository,
+      fileStorage,
+      failingParser,
+      pino({ level: 'silent' }),
+    );
+
+    const result = await run(upload);
+
+    // 2 rows < PROGRESS_EVERY_ROWS (500): none were flushed, so processedRows stays 0.
+    expect(result.value).toMatchObject({
+      status: 'FAILED',
+      totalRows: 3,
+      processedRows: 0,
+      failedRows: 0,
+    });
+    const stored = await persisted(upload);
+    expect(stored.status.value).toBe('FAILED');
+    expect(stored.errorMessage).toBe('Malformed quoted field at line 4');
+    expect(stored.processedRows).toBe(0);
+    expect(stored.failedRows).toBe(0);
+    expect(activityDataRepository.rows).toHaveLength(0);
   });
 
   it('reprocesses a PROCESSING upload after redelivery without duplicates', async () => {
