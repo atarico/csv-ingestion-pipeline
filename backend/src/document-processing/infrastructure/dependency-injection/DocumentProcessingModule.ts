@@ -10,6 +10,7 @@ import { GetUploadByIdController } from '../../presentation/controllers/GetUploa
 import { GetUploadResultsController } from '../../presentation/controllers/GetUploadResultsController.js';
 import { GetUploadStatsController } from '../../presentation/controllers/GetUploadStatsController.js';
 import { ListUploadsController } from '../../presentation/controllers/ListUploadsController.js';
+import { FileProcessingWorker } from '../../../workers/FileProcessingWorker.js';
 import { CsvParseCsvParser } from '../csv/CsvParseCsvParser.js';
 import { PrismaActivityDataRepository } from '../persistence/repositories/PrismaActivityDataRepository.js';
 import { PrismaUploadRepository } from '../persistence/repositories/PrismaUploadRepository.js';
@@ -22,6 +23,7 @@ export function registerDocumentProcessingModule(container: AwilixContainer): vo
     csvParser: asClass(CsvParseCsvParser).singleton(),
     createUploadCommandHandler: asClass(CreateUploadCommandHandler).singleton(),
     processFileCommandHandler: asClass(ProcessFileCommandHandler).singleton(),
+    fileProcessingWorker: asClass(FileProcessingWorker).singleton(),
     getUploadByIdQueryHandler: asClass(GetUploadByIdQueryHandler).singleton(),
     listUploadsQueryHandler: asClass(ListUploadsQueryHandler).singleton(),
     getUploadResultsQueryHandler: asClass(GetUploadResultsQueryHandler).singleton(),

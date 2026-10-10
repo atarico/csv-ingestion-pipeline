@@ -7,6 +7,7 @@ import { ProcessFileCommandHandler } from '../document-processing/application/co
 import { GetUploadResultsQueryHandler } from '../document-processing/application/queries/handlers/GetUploadResultsQueryHandler.js';
 import { InMemoryFileStorage } from '../shared/infrastructure/testing/InMemoryFileStorage.js';
 import { InMemoryMessageQueue } from '../shared/infrastructure/testing/InMemoryMessageQueue.js';
+import { FileProcessingWorker } from '../workers/FileProcessingWorker.js';
 import { createAppContainer } from './container.js';
 
 describe('createAppContainer', () => {
@@ -37,6 +38,16 @@ describe('createAppContainer', () => {
     expect(container.resolve('getUploadByIdQueryHandler')).toBeDefined();
     expect(container.resolve('listUploadsQueryHandler')).toBeDefined();
     expect(container.resolve('getUploadStatsQueryHandler')).toBeDefined();
+  });
+
+  it('resolves the file processing worker with the worker policy from config', () => {
+    const container = build();
+
+    expect(container.resolve('fileProcessingWorker')).toBeInstanceOf(FileProcessingWorker);
+    expect(container.resolve('workerPolicy')).toMatchObject({
+      maxReceiveCount: 3,
+      retryBackoffBaseSeconds: 15,
+    });
   });
 
   it('returns singletons', () => {
