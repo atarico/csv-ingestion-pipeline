@@ -32,7 +32,8 @@ export function buildApp(container: AwilixContainer): FastifyInstance {
   });
 
   app.register(cors, { origin: config.corsOrigin });
-  // One file part and nothing else; busboy counts the file as one of the two allowed parts.
+  // One file part and nothing else; busboy counts the file as one of the two allowed parts. Extra
+  // parts are rejected by the adapter's own check or by the FST_*_LIMIT mapping in the error handler.
   app.register(multipart, { limits: { fileSize: maxBytes, files: 1, fields: 0, parts: 2 } });
 
   app.addHook('onSend', (request, reply) => {

@@ -375,8 +375,6 @@ Estado real de lo que no está completo o no se pudo comprobar:
 - **Mensajes en inglés.** Los mensajes de la API y de los errores (por ejemplo
   `Invalid CSV header: missing [date]`) están en inglés a propósito, como parte del
   contrato de la API; la interfaz los muestra tal cual, dentro de una UI en español.
-- **Texto adicional en la subida.** Si junto al archivo válido se envía un campo de texto
-  extra en el multipart, se ignora (no se rechaza).
 - **Apagado.** Con `docker compose stop` el worker termina en menos de un segundo (medido:
   0,3 s, código de salida 0), porque la espera de la recepción en curso se cancela; los
   servicios tienen `stop_grace_period` (30 s el worker, 15 s la API). La API no tiene un
@@ -475,6 +473,8 @@ El handler lee `fileKey` de la base de datos, así que un mensaje falsificado no
 forzar un fallo; borrar el objeto de S3 es el procedimiento admitido.
 
 ### Ejemplos con curl
+
+La petición de subida debe contener exactamente una parte multipart, el archivo en el campo `file`; cualquier otra parte (un segundo archivo o un campo de texto) devuelve 400.
 
 ```bash
 # Subir un archivo (campo multipart "file")
