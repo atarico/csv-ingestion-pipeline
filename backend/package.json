@@ -22,7 +22,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:new": "prisma migrate dev --name",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "test:coverage": "vitest run --coverage --project unit"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1149.0",
@@ -45,6 +46,7 @@
     "@types/convict": "6.1.6",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9.39.5",
     "pino-pretty": "^13.2.0",
     "prettier": "^3.9.9",
