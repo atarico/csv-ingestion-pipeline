@@ -4,7 +4,12 @@ export default defineConfig({
   test: {
     projects: [
       {
-        test: { name: 'unit', include: ['src/**/*.test.ts'], environment: 'node' },
+        test: {
+          name: 'unit',
+          include: ['src/**/*.test.ts'],
+          exclude: ['**/node_modules/**', '**/*.integration.test.ts'],
+          environment: 'node',
+        },
       },
       {
         test: {
