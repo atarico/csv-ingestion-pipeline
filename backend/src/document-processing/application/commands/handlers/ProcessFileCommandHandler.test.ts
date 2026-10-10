@@ -116,6 +116,17 @@ describe('ProcessFileCommandHandler', () => {
     ]);
   });
 
+  it('turns a category with a control character into a row error', async () => {
+    const upload = await seedUpload(csv(VALID_ROW, 'ener\u0000gy,10,kWh,2026-01-15'));
+
+    const result = await run(upload);
+
+    expect(result.value).toMatchObject({ status: 'COMPLETED', processedRows: 1, failedRows: 1 });
+    const stored = await persisted(upload);
+    expect(stored.status.value).toBe('COMPLETED');
+    expect(stored.rowErrors.map((e) => [e.row, e.field])).toEqual([[2, 'category']]);
+  });
+
   it('fails on invalid header', async () => {
     const upload = await seedUpload('category,amount,unit\nenergy,1,kWh\n');
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ValidationError } from '../../../shared/domain/DomainError.js';
 import { FileName } from './FileName.js';
 
 describe('FileName', () => {
@@ -42,6 +43,18 @@ describe('FileName', () => {
       const result = FileName.create(raw);
       expect(result.isLeft() && result.value.message).toBe(
         'fileName must not contain path separators',
+      );
+    }
+  });
+
+  it('rejects control characters', () => {
+    const result = FileName.create('data\u0000.csv');
+    expect(result.isLeft()).toBe(true);
+    if (result.isLeft()) {
+      expect(result.value.message).toBe('must not contain control characters');
+      expect(result.value).toBeInstanceOf(ValidationError);
+      expect(result.value instanceof ValidationError && result.value.fieldErrors[0]?.field).toBe(
+        'fileName',
       );
     }
   });

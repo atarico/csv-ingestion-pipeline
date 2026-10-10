@@ -1,4 +1,8 @@
 import { Either } from '../../../shared/domain/Either.js';
+import {
+  CONTROL_CHARACTERS_MESSAGE,
+  hasControlCharacters,
+} from '../../../shared/domain/ControlCharacters.js';
 import { UnsupportedFileError, ValidationError } from '../../../shared/domain/DomainError.js';
 import { ValueObject } from '../../../shared/domain/ValueObject.js';
 
@@ -19,6 +23,7 @@ export class FileName extends ValueObject<{ value: string }> {
     }
     const value = raw.trim();
     if (value.length === 0) return FileName.invalid('fileName is required');
+    if (hasControlCharacters(value)) return FileName.invalid(CONTROL_CHARACTERS_MESSAGE);
     if (value.length > FileName.MAX_LENGTH) {
       return FileName.invalid(`fileName must be at most ${FileName.MAX_LENGTH} characters`);
     }

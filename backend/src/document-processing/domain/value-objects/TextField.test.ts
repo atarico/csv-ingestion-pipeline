@@ -29,6 +29,18 @@ describe('Category', () => {
     expect(result.isLeft() && result.value.message).toBe('category must be at most 100 characters');
     expect(Category.create('a'.repeat(100)).isRight()).toBe(true);
   });
+
+  it('rejects control characters', () => {
+    const result = Category.create('Electri\u0000city');
+    expect(result.isLeft()).toBe(true);
+    if (result.isLeft()) {
+      expect(result.value.message).toBe('must not contain control characters');
+      expect(result.value.fieldErrors[0]).toEqual({
+        field: 'category',
+        message: 'must not contain control characters',
+      });
+    }
+  });
 });
 
 describe('Unit', () => {
@@ -41,6 +53,15 @@ describe('Unit', () => {
     const result = Unit.create('u'.repeat(21));
     expect(result.isLeft() && result.value.message).toBe('unit must be at most 20 characters');
     expect(Unit.create('u'.repeat(20)).isRight()).toBe(true);
+  });
+
+  it('rejects control characters', () => {
+    const result = Unit.create('k\u0007Wh');
+    expect(result.isLeft()).toBe(true);
+    if (result.isLeft()) {
+      expect(result.value.message).toBe('must not contain control characters');
+      expect(result.value.fieldErrors[0]?.field).toBe('unit');
+    }
   });
 
   it('rejects empty with the field name', () => {
