@@ -1,120 +1,128 @@
-# AWS target architecture
+# Arquitectura objetivo en AWS
 
-Production-oriented deployment of the same system that runs locally on Docker Compose
-(PostgreSQL + LocalStack). Nothing here is deployed by this repository; it documents how
-the components map to AWS services.
+Despliegue orientado a producción del mismo sistema que se ejecuta en local con Docker
+Compose (PostgreSQL + LocalStack). Este repositorio no despliega nada de esto; documenta cómo
+se corresponden los componentes con los servicios de AWS.
 
 ```mermaid
 graph TB
-    user([Browser])
+    user([Navegador])
 
-    subgraph edge["Edge"]
+    subgraph edge["Borde"]
         r53[Route 53]
-        cf[CloudFront]
-        s3web[(S3 static assets)]
-        acm[ACM certificate]
+        cf["CloudFront<br/>caché delante del ALB"]
+        acm[Certificado ACM]
     end
 
-    subgraph vpc["VPC - 2 Availability Zones"]
-        subgraph pub["Public subnets"]
+    subgraph vpc["VPC - 2 zonas de disponibilidad"]
+        subgraph pub["Subredes públicas"]
             alb[Application Load Balancer<br/>HTTPS]
             nat[NAT Gateway]
         end
-        subgraph priv["Private subnets"]
-            subgraph ecs["ECS Fargate cluster"]
-                api["api-service<br/>2+ tasks, autoscaling on CPU and requests"]
-                worker["worker-service<br/>1+ tasks, autoscaling on queue depth"]
+        subgraph priv["Subredes privadas"]
+            subgraph ecs["Clúster ECS Fargate"]
+                fe["frontend-service<br/>Next.js standalone, 2+ tareas, puerto 3000"]
+                api["api-service<br/>2+ tareas, autoescalado por CPU y peticiones, puerto 4000"]
+                worker["worker-service<br/>1+ tareas, autoescalado por profundidad de cola"]
             end
             rds[("RDS PostgreSQL<br/>Multi-AZ")]
-            vpce{{"VPC endpoints<br/>S3 gateway, SQS, Secrets Manager, CloudWatch"}}
+            vpce{{"Endpoints de VPC<br/>S3 gateway, SQS, Secrets Manager, CloudWatch"}}
         end
     end
 
-    subgraph data["AWS managed services"]
-        s3[("S3 bucket document-processing<br/>private, SSE-S3, lifecycle 90 days")]
-        sqs[["SQS file-processing<br/>visibility 60 s"]]
+    subgraph data["Servicios gestionados de AWS"]
+        s3[("Bucket S3 document-processing<br/>privado, SSE-S3, ciclo de vida 90 días")]
+        sqs[["SQS file-processing<br/>visibilidad 60 s"]]
         dlq[["SQS file-processing-dlq<br/>maxReceiveCount 3"]]
-        sm[Secrets Manager<br/>DATABASE_URL and app secrets]
-        cw[CloudWatch<br/>Logs, metrics, alarms]
+        sm[Secrets Manager<br/>DATABASE_URL y secretos de la aplicación]
+        cw[CloudWatch<br/>Logs, métricas, alarmas]
     end
 
     user --> r53 --> cf
-    cf --> s3web
     cf --> alb
     acm -.-> alb
-    alb --> api
+    alb -->|"/ y /uploads/[id]"| fe
+    alb -->|"/api/*"| api
     api -->|SQL 5432| rds
     api -->|PutObject| s3
     api -->|SendMessage| sqs
     sqs -->|ReceiveMessage| worker
-    sqs -->|redrive after 3 receives| dlq
+    sqs -->|redrive tras 3 recepciones| dlq
     worker -->|GetObject| s3
     worker -->|SQL 5432| rds
-    sm -.->|secrets injected into task definitions| ecs
+    sm -.->|secretos inyectados en las definiciones de tarea| ecs
+    fe -.->|logs| cw
     api -.->|logs| cw
     worker -.->|logs| cw
-    dlq -.->|alarm depth greater than 0| cw
+    dlq -.->|alarma con profundidad mayor que 0| cw
     ecs -.-> vpce
-    ecs -.->|other outbound traffic| nat
+    ecs -.->|resto del tráfico saliente| nat
 ```
 
-The diagram source is `docs/arquitectura-aws.mmd`; `docs/arquitectura-aws.png` is rendered
-from it with `minlag/mermaid-cli` (see the command at the end of this file).
+El origen del diagrama es `docs/arquitectura-aws.mmd`; `docs/arquitectura-aws.png` se genera
+a partir de él con `minlag/mermaid-cli` (ver el comando al final de este archivo).
 
-## Components
+## Componentes
 
-| Component | Purpose | Why |
-|-----------|---------|-----|
-| Route 53 | DNS for the public domain | Optional; keeps the entry point independent from the load balancer |
-| CloudFront + S3 static | Serves the frontend assets (or an ECS task if SSR is needed) | Cache close to users; no servers to run for static assets |
-| ACM | TLS certificate for CloudFront and the ALB | Free managed certificates with automatic renewal |
-| ALB (public subnets) | HTTPS entry point, forwards `/api/*` to the API target group | Health checks and zero-downtime deployments |
-| NAT Gateway (public subnets) | Outbound internet for private tasks | Only for traffic that cannot use VPC endpoints |
-| ECS Fargate `api-service` | Fastify API, 2+ tasks across two AZs, autoscaling on CPU and requests | Stateless, horizontally scalable, no host management |
-| ECS Fargate `worker-service` | CSV worker, 1+ tasks, autoscaling on SQS `ApproximateNumberOfMessagesVisible` | Scales with the backlog, independent from API traffic |
-| RDS PostgreSQL Multi-AZ | `Upload` and `ActivityData` | Automatic failover; private subnets; the security group accepts only the ECS security group on 5432 |
-| S3 bucket `document-processing` | Uploaded CSV files | Private, block public access, SSE-S3, lifecycle expires `uploads/` after 90 days and aborts incomplete multipart uploads |
-| SQS `file-processing` | Upload messages, visibility timeout 60 s | Decouples the API from the processing time |
-| SQS `file-processing-dlq` | Dead-letter queue, `maxReceiveCount` 3 | Keeps messages that failed three times for inspection or redrive |
-| CloudWatch | Logs of API and worker, metrics, alarms (5xx, DLQ depth greater than 0, oldest message age) | Operational visibility and alerting |
-| Secrets Manager | `DATABASE_URL` and application secrets injected into the task definitions | No secrets in images or environment files |
-| IAM task roles | S3 `GetObject`/`PutObject` on the bucket; SQS `SendMessage`/`ReceiveMessage`/`DeleteMessage` on the queue | Least privilege per service |
-| VPC endpoints | Gateway endpoint for S3; interface endpoints for SQS, Secrets Manager and CloudWatch | Private tasks reach AWS services without crossing the NAT |
+| Componente | Propósito | Motivo |
+|------------|-----------|--------|
+| Route 53 | DNS del dominio público | Opcional; mantiene el punto de entrada independiente del balanceador |
+| CloudFront | Caché delante del ALB para las respuestas del frontend y los recursos estáticos de `/_next/static` | Caché cercana al usuario; el origen sigue siendo el ALB |
+| ACM | Certificado TLS para CloudFront y el ALB | Certificados gestionados gratuitos con renovación automática |
+| ALB (subredes públicas) | Punto de entrada HTTPS; reenvía `/api/*` al grupo de destino de la API y el resto al del frontend | Health checks y despliegues sin interrupción |
+| NAT Gateway (subredes públicas) | Salida a Internet de las tareas privadas | Solo para el tráfico que no puede usar endpoints de VPC |
+| ECS Fargate `frontend-service` | Servidor Next.js (`output: 'standalone'`, puerto 3000) con la ruta dinámica `/uploads/[id]`, 2+ tareas en dos zonas | El build no es un sitio estático, así que necesita un servidor; sin estado y escalable horizontalmente |
+| ECS Fargate `api-service` | API Fastify (puerto 4000), 2+ tareas en dos zonas, autoescalado por CPU y peticiones | Sin estado, escalable horizontalmente, sin gestión de servidores |
+| ECS Fargate `worker-service` | Worker de CSV, 1+ tareas, autoescalado por `ApproximateNumberOfMessagesVisible` de SQS | Escala con la cola, independiente del tráfico de la API |
+| RDS PostgreSQL Multi-AZ | `Upload` y `ActivityData` | Conmutación automática; subredes privadas; el security group solo acepta el de API y worker en el puerto 5432 |
+| Bucket S3 `document-processing` | Archivos CSV subidos | Privado, acceso público bloqueado, SSE-S3, el ciclo de vida expira `uploads/` a los 90 días y aborta las cargas multiparte incompletas |
+| SQS `file-processing` | Mensajes de subida, visibility timeout de 60 s | Desacopla la API del tiempo de procesamiento |
+| SQS `file-processing-dlq` | Cola de mensajes fallidos, `maxReceiveCount` 3 | Conserva los mensajes que fallaron tres veces para inspeccionarlos o reencolarlos |
+| CloudWatch | Logs del frontend, la API y el worker, métricas, alarmas (5xx, profundidad de la DLQ mayor que 0, antigüedad del mensaje más viejo) | Visibilidad operativa y alertas |
+| Secrets Manager | `DATABASE_URL` y secretos de la aplicación inyectados en las definiciones de tarea | Sin secretos en imágenes ni en archivos de entorno |
+| Roles de tarea IAM | API: S3 `PutObject` sobre el bucket y SQS `SendMessage` sobre la cola. Worker: S3 `GetObject` sobre el bucket y SQS `ReceiveMessage`, `DeleteMessage` y `ChangeMessageVisibility` sobre la cola | Mínimo privilegio por servicio; los reintentos dependen de `ChangeMessageVisibility` |
+| Endpoints de VPC | Endpoint gateway para S3; endpoints de interfaz para SQS, Secrets Manager y CloudWatch | Las tareas privadas llegan a los servicios de AWS sin pasar por el NAT |
+| Security groups | ALB: 443 desde Internet; frontend: 3000 solo desde el ALB; API: 4000 solo desde el ALB; worker: sin entrada; RDS: 5432 solo desde API y worker; endpoints de interfaz: 443 desde API y worker | Mínimo privilegio en red |
 
-## Request path
+## Ruta de una petición
 
-Browser → CloudFront → ALB (HTTPS) → `api-service` task → S3 (store file) → RDS (insert
-`PENDING` upload) → SQS (publish message) → `201` response. The browser then polls
-`GET /api/v1/uploads/:id` every 3 s while the status is `PENDING` or `PROCESSING`.
+Navegador → CloudFront → ALB (HTTPS) → tarea de `frontend-service` (páginas, incluida
+`/uploads/[id]`). Para subir un archivo, el navegador llama a `/api/*`: ALB → tarea de
+`api-service` → S3 (guarda el archivo) → RDS (inserta la subida `PENDING`) → SQS (publica el
+mensaje) → respuesta `201`. Después el navegador consulta `GET /api/v1/uploads/:id` cada 3 s
+mientras el estado sea `PENDING` o `PROCESSING`.
 
-## Processing path
+## Ruta de procesamiento
 
-SQS → `worker-service` task (long polling) → S3 (download) → RDS (status `PROCESSING`,
-batch insert of valid rows, progress, final status) → SQS (delete message).
+SQS → tarea de `worker-service` (long polling) → S3 (descarga) → RDS (estado `PROCESSING`,
+inserción por lotes de las filas válidas, progreso, estado final) → SQS (borra el mensaje).
 
-## Scaling and failure notes
+## Escalado y fallos
 
-- API and worker are stateless and scale independently; the worker scales on queue depth.
-- RDS Multi-AZ fails over automatically; ECS replaces unhealthy tasks across AZs.
-- A message is received up to 3 times (visibility timeout 60 s, per-message backoff of
-  15 s then 30 s through `ChangeMessageVisibility`); after that SQS moves it to the DLQ and
-  the CloudWatch alarm on DLQ depth fires. Reprocessing is idempotent (previous rows of the
-  upload are deleted and `@@unique([uploadId, rowNumber])` guards duplicates).
-- With several workers, a file that takes longer than the visibility timeout plus the retry
-  delay could be processed twice; a visibility heartbeat is future work (see README).
+- API, frontend y worker no tienen estado y escalan de forma independiente; el worker escala
+  según la profundidad de la cola.
+- RDS Multi-AZ conmuta automáticamente; ECS reemplaza las tareas no saludables entre zonas.
+- Un mensaje se recibe hasta 3 veces (visibility timeout de 60 s, espera por mensaje de 15 s
+  y luego 30 s mediante `ChangeMessageVisibility`); después SQS lo mueve a la DLQ y se
+  dispara la alarma de CloudWatch sobre su profundidad. El reprocesamiento es idempotente
+  (las filas previas de la subida se borran y `@@unique([uploadId, rowNumber])` evita
+  duplicados).
+- Con varios workers, un archivo que tarde más que el visibility timeout (60 s) vuelve a ser
+  visible y otro worker puede recibirlo; un heartbeat de visibilidad queda como trabajo
+  futuro (ver README).
 
-## Cost note
+## Nota de costes
 
-Fargate Spot is an option for `worker-service`: interrupted tasks leave the message in the
-queue and it is redelivered. Interface VPC endpoints have an hourly cost that should be
-compared with the NAT Gateway traffic they replace.
+Fargate Spot es una opción para `worker-service`: las tareas interrumpidas dejan el mensaje
+en la cola y se vuelve a entregar. Los endpoints de interfaz de VPC tienen un coste por hora
+que conviene comparar con el tráfico de NAT Gateway que sustituyen.
 
-## Rendering the PNG
+## Generar el PNG
 
 ```bash
 docker run --rm -u "$(id -u):$(id -g)" -v "$PWD/docs:/data" minlag/mermaid-cli \
   -i /data/arquitectura-aws.mmd -o /data/arquitectura-aws.png -b white -s 2
 ```
 
-The `-w 1600` option from older `mermaid-cli` releases no longer exists in the current
-image; `-s 2` (scale factor) is used instead.
+La opción `-w 1600` de versiones antiguas de `mermaid-cli` ya no existe en la imagen actual;
+se usa `-s 2` (factor de escala).

@@ -1,51 +1,52 @@
 graph TB
-    user([Browser])
+    user([Navegador])
 
-    subgraph edge["Edge"]
+    subgraph edge["Borde"]
         r53[Route 53]
-        cf[CloudFront]
-        s3web[(S3 static assets)]
-        acm[ACM certificate]
+        cf["CloudFront<br/>caché delante del ALB"]
+        acm[Certificado ACM]
     end
 
-    subgraph vpc["VPC - 2 Availability Zones"]
-        subgraph pub["Public subnets"]
+    subgraph vpc["VPC - 2 zonas de disponibilidad"]
+        subgraph pub["Subredes públicas"]
             alb[Application Load Balancer<br/>HTTPS]
             nat[NAT Gateway]
         end
-        subgraph priv["Private subnets"]
-            subgraph ecs["ECS Fargate cluster"]
-                api["api-service<br/>2+ tasks, autoscaling on CPU and requests"]
-                worker["worker-service<br/>1+ tasks, autoscaling on queue depth"]
+        subgraph priv["Subredes privadas"]
+            subgraph ecs["Clúster ECS Fargate"]
+                fe["frontend-service<br/>Next.js standalone, 2+ tareas, puerto 3000"]
+                api["api-service<br/>2+ tareas, autoescalado por CPU y peticiones, puerto 4000"]
+                worker["worker-service<br/>1+ tareas, autoescalado por profundidad de cola"]
             end
             rds[("RDS PostgreSQL<br/>Multi-AZ")]
-            vpce{{"VPC endpoints<br/>S3 gateway, SQS, Secrets Manager, CloudWatch"}}
+            vpce{{"Endpoints de VPC<br/>S3 gateway, SQS, Secrets Manager, CloudWatch"}}
         end
     end
 
-    subgraph data["AWS managed services"]
-        s3[("S3 bucket document-processing<br/>private, SSE-S3, lifecycle 90 days")]
-        sqs[["SQS file-processing<br/>visibility 60 s"]]
+    subgraph data["Servicios gestionados de AWS"]
+        s3[("Bucket S3 document-processing<br/>privado, SSE-S3, ciclo de vida 90 días")]
+        sqs[["SQS file-processing<br/>visibilidad 60 s"]]
         dlq[["SQS file-processing-dlq<br/>maxReceiveCount 3"]]
-        sm[Secrets Manager<br/>DATABASE_URL and app secrets]
-        cw[CloudWatch<br/>Logs, metrics, alarms]
+        sm[Secrets Manager<br/>DATABASE_URL y secretos de la aplicación]
+        cw[CloudWatch<br/>Logs, métricas, alarmas]
     end
 
     user --> r53 --> cf
-    cf --> s3web
     cf --> alb
     acm -.-> alb
-    alb --> api
+    alb -->|"/ y /uploads/[id]"| fe
+    alb -->|"/api/*"| api
     api -->|SQL 5432| rds
     api -->|PutObject| s3
     api -->|SendMessage| sqs
     sqs -->|ReceiveMessage| worker
-    sqs -->|redrive after 3 receives| dlq
+    sqs -->|redrive tras 3 recepciones| dlq
     worker -->|GetObject| s3
     worker -->|SQL 5432| rds
-    sm -.->|secrets injected into task definitions| ecs
+    sm -.->|secretos inyectados en las definiciones de tarea| ecs
+    fe -.->|logs| cw
     api -.->|logs| cw
     worker -.->|logs| cw
-    dlq -.->|alarm depth greater than 0| cw
+    dlq -.->|alarma con profundidad mayor que 0| cw
     ecs -.-> vpce
-    ecs -.->|other outbound traffic| nat
+    ecs -.->|resto del tráfico saliente| nat
