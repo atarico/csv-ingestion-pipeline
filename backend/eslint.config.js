@@ -2,7 +2,7 @@ import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'src/generated/**', 'eslint.config.js', 'vitest.config.ts', 'prisma.config.ts'] },
+  { ignores: ['dist/**', 'coverage/**', 'src/generated/**', 'eslint.config.js', 'vitest.config.ts', 'prisma.config.ts'] },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {

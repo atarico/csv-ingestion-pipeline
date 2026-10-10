@@ -12,44 +12,34 @@ import {
   resetTestState,
   type TestApp,
 } from '../../test/buildTestApp.js';
+import { buildMultipart } from '../../test/multipart.js';
 
 const USER_ID = 'user-123';
 const API = '/api/v1';
 const CSV = 'category,amount,unit,date\nElectricity,10.5,kWh,2024-01-15\n';
 
 interface FilePart {
-  fieldName?: string;
   fileName: string;
   content: string | Buffer;
   mimeType?: string;
 }
 
-/** Builds a multipart/form-data body with a manual boundary (no extra dependency). */
-function multipartBody(part?: FilePart): { payload: Buffer; headers: Record<string, string> } {
-  const boundary = `----carbonbox${randomUUID()}`;
-  const chunks: Buffer[] = [];
-  if (part !== undefined) {
-    chunks.push(
-      Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="${part.fieldName ?? 'file'}"; filename="${part.fileName}"\r\nContent-Type: ${part.mimeType ?? 'text/csv'}\r\n\r\n`,
-      ),
-      Buffer.isBuffer(part.content) ? part.content : Buffer.from(part.content),
-      Buffer.from('\r\n'),
-    );
-  } else {
-    chunks.push(
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="note"\r\n\r\nhello\r\n`),
-    );
-  }
-  chunks.push(Buffer.from(`--${boundary}--\r\n`));
+/** A multipart body without any file part (only a text field). */
+function multipartWithoutFile(): { payload: Buffer; headers: Record<string, string> } {
+  const boundary = '----vitest-boundary';
   return {
-    payload: Buffer.concat(chunks),
+    payload: Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="note"\r\n\r\nhello\r\n--${boundary}--\r\n`,
+    ),
     headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
   };
 }
 
 async function postUpload(ctx: TestApp, part?: FilePart) {
-  const { payload, headers } = multipartBody(part);
+  const { payload, headers } =
+    part === undefined
+      ? multipartWithoutFile()
+      : buildMultipart(part.fileName, part.content, part.mimeType);
   return ctx.app.inject({ method: 'POST', url: `${API}/uploads`, payload, headers });
 }
 
@@ -187,10 +177,7 @@ describe('Uploads REST API', () => {
     it('over the size limit returns 413 FILE_TOO_LARGE', async () => {
       const small = await buildTestApp({ maxFileSizeBytes: 1024 });
       extraApps.push(small);
-      const { payload, headers } = multipartBody({
-        fileName: 'big.csv',
-        content: Buffer.alloc(2048, 'a'),
-      });
+      const { payload, headers } = buildMultipart('big.csv', Buffer.alloc(2048, 'a'));
       const response = await small.app.inject({
         method: 'POST',
         url: `${API}/uploads`,
