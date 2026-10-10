@@ -5,6 +5,11 @@ import { GetUploadByIdQueryHandler } from '../../application/queries/handlers/Ge
 import { GetUploadResultsQueryHandler } from '../../application/queries/handlers/GetUploadResultsQueryHandler.js';
 import { GetUploadStatsQueryHandler } from '../../application/queries/handlers/GetUploadStatsQueryHandler.js';
 import { ListUploadsQueryHandler } from '../../application/queries/handlers/ListUploadsQueryHandler.js';
+import { CreateUploadController } from '../../presentation/controllers/CreateUploadController.js';
+import { GetUploadByIdController } from '../../presentation/controllers/GetUploadByIdController.js';
+import { GetUploadResultsController } from '../../presentation/controllers/GetUploadResultsController.js';
+import { GetUploadStatsController } from '../../presentation/controllers/GetUploadStatsController.js';
+import { ListUploadsController } from '../../presentation/controllers/ListUploadsController.js';
 import { CsvParseCsvParser } from '../csv/CsvParseCsvParser.js';
 import { PrismaActivityDataRepository } from '../persistence/repositories/PrismaActivityDataRepository.js';
 import { PrismaUploadRepository } from '../persistence/repositories/PrismaUploadRepository.js';
@@ -21,5 +26,10 @@ export function registerDocumentProcessingModule(container: AwilixContainer): vo
     listUploadsQueryHandler: asClass(ListUploadsQueryHandler).singleton(),
     getUploadResultsQueryHandler: asClass(GetUploadResultsQueryHandler).singleton(),
     getUploadStatsQueryHandler: asClass(GetUploadStatsQueryHandler).singleton(),
+    createUploadController: asClass(CreateUploadController).singleton(),
+    getUploadByIdController: asClass(GetUploadByIdController).singleton(),
+    listUploadsController: asClass(ListUploadsController).singleton(),
+    getUploadResultsController: asClass(GetUploadResultsController).singleton(),
+    getUploadStatsController: asClass(GetUploadStatsController).singleton(),
   });
 }
