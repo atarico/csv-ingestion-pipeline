@@ -40,7 +40,7 @@ export class InMemoryUploadRepository implements IUploadRepository {
   findByUser(userId: string, pagination: PaginationParams): Promise<PaginatedResult<Upload>> {
     const owned = [...this.uploads.values()]
       .filter((upload) => upload.userId === userId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id));
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id));
     const start = (pagination.page - 1) * pagination.limit;
     return Promise.resolve({
       items: owned.slice(start, start + pagination.limit).map(copyOf),

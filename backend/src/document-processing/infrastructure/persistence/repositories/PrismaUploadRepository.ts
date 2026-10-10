@@ -29,7 +29,8 @@ export class PrismaUploadRepository implements IUploadRepository {
     const [records, total] = await this.prismaClient.$transaction([
       this.prismaClient.upload.findMany({
         where: { userId },
-        orderBy: { createdAt: 'desc' },
+        // `id` breaks createdAt ties so pages never overlap or skip rows.
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip: (page - 1) * limit,
         take: limit,
       }),
