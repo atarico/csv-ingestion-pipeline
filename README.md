@@ -471,9 +471,30 @@ Los errores tienen la forma `{"error":{"code","message","details?"},"requestId"}
 Las pruebas se escribieron antes que el código en cada capa. Los adaptadores de S3 y SQS no
 tienen pruebas automáticas (ver "Limitaciones conocidas").
 
+### Pruebas E2E
+
+El paquete independiente `e2e/` contiene pruebas de navegador (Playwright, solo Chromium)
+que usan únicamente la interfaz: no importan código de la aplicación. Necesitan el stack
+completo en marcha:
+
+```bash
+docker compose --profile app up -d --build --wait
+cd e2e
+npm ci
+npx playwright install chromium   # solo la primera vez
+npm test                          # E2E_BASE_URL cambia la URL (por defecto http://localhost:3000)
+```
+
+Cada prueba sube el archivo con un nombre único, así que no depende de las filas que ya
+existan en la base. Cubren: el CSV válido (`sample-data.csv`, 60 filas) hasta
+"Completado" y su aparición en la lista; `samples/sample-with-errors.csv` (19 filas
+válidas, 6 con error, errores por fila visibles); `samples/invalid-header.csv`
+("Fallido" con `Invalid CSV header: missing [date]`); y el rechazo en el cliente de un
+archivo que no es `.csv`. En fallo se genera `e2e/playwright-report/`.
+
 CI: el workflow `.github/workflows/ci.yml` define un job `backend` (generate, lint,
-typecheck, unitarias, integración con PostgreSQL, build) y un job `frontend` (lint,
-typecheck, pruebas, build). <!-- TODO (candidato): al publicar el repositorio, enlazar aquí la primera ejecución verde de CI. --> Todavía no se ha ejecutado en GitHub; se
+typecheck, unitarias, integración con PostgreSQL, build) un job `frontend` (lint,
+typecheck, pruebas, build) y un job `e2e` (levanta el stack con Compose y ejecuta Playwright). <!-- TODO (candidato): al publicar el repositorio, enlazar aquí la primera ejecución verde de CI. --> Todavía no se ha ejecutado en GitHub; se
 validó en local con `actionlint` y reproduciendo cada job.
 
 ## Diagrama de infraestructura AWS
