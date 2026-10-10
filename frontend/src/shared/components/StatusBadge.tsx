@@ -7,10 +7,14 @@ const STATUS_STYLES: Record<UploadStatusValue, { label: string; className: strin
   FAILED: { label: 'Fallido', className: 'bg-red-100 text-red-800' },
 };
 
-export function StatusBadge({ status }: { status: UploadStatusValue }) {
+/**
+ * `announce` makes the badge a live region; keep it off inside tables, where every refresh
+ * would otherwise be announced once per row.
+ */
+export function StatusBadge({ status, announce = false }: { status: UploadStatusValue; announce?: boolean }) {
   const { label, className } = STATUS_STYLES[status];
   return (
-    <span role="status" className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${className}`}>
+    <span role={announce ? 'status' : undefined} className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${className}`}>
       {label}
     </span>
   );

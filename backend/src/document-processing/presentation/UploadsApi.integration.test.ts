@@ -116,6 +116,30 @@ describe('Uploads REST API', () => {
     await ctx.container.dispose();
   });
 
+  describe('x-request-id', () => {
+    it('keeps a valid UUID header', async () => {
+      const id = randomUUID();
+      const response = await ctx.app.inject({
+        method: 'GET',
+        url: '/nope',
+        headers: { 'x-request-id': id },
+      });
+      expect(response.headers['x-request-id']).toBe(id);
+      expect(response.json<{ requestId: string }>().requestId).toBe(id);
+    });
+
+    it('replaces an invalid header with a fresh UUID', async () => {
+      const response = await ctx.app.inject({
+        method: 'GET',
+        url: '/nope',
+        headers: { 'x-request-id': 'not-a-uuid-injected' },
+      });
+      const requestId = response.json<{ requestId: string }>().requestId;
+      expect(requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+      expect(response.headers['x-request-id']).toBe(requestId);
+    });
+  });
+
   it('GET /health returns ok with a request id header', async () => {
     const response = await ctx.app.inject({ method: 'GET', url: '/health' });
     expect(response.statusCode).toBe(200);
@@ -150,6 +174,21 @@ describe('Uploads REST API', () => {
       const body = response.json<{ error: { code: string; details: Array<{ field: string }> } }>();
       expect(body.error.code).toBe('VALIDATION_ERROR');
       expect(body.error.details[0]?.field).toBe('file');
+    });
+
+    it('with the file under another field name returns 400 VALIDATION_ERROR on field file', async () => {
+      const { payload, headers } = buildMultipart('sample.csv', CSV);
+      const response = await ctx.app.inject({
+        method: 'POST',
+        url: `${API}/uploads`,
+        payload: Buffer.from(payload.toString().replace('name="file"', 'name="document"')),
+        headers,
+      });
+      expect(response.statusCode).toBe(400);
+      const body = response.json<{ error: { code: string; details: Array<{ field: string }> } }>();
+      expect(body.error.code).toBe('VALIDATION_ERROR');
+      expect(body.error.details[0]?.field).toBe('file');
+      expect(await persistedUploadStatuses(ctx)).toEqual([]);
     });
 
     it('with data.txt returns 400 UNSUPPORTED_FILE', async () => {
@@ -265,6 +304,12 @@ describe('Uploads REST API', () => {
       expect(body.data.map((item) => item.fileName)).toEqual(['file-1.csv', 'file-0.csv']);
     });
 
+    it('page=999999999 returns 400', async () => {
+      const response = await ctx.app.inject({ method: 'GET', url: `${API}/uploads?page=999999999` });
+      expect(response.statusCode).toBe(400);
+      expect(response.json<{ error: { code: string } }>().error.code).toBe('VALIDATION_ERROR');
+    });
+
     it('limit=1000 returns 400', async () => {
       const response = await ctx.app.inject({ method: 'GET', url: `${API}/uploads?limit=1000` });
       expect(response.statusCode).toBe(400);
@@ -310,6 +355,16 @@ describe('Uploads REST API', () => {
       expect(body.total).toBe(3);
       expect(body.limit).toBe(100);
       expect(body.page).toBe(1);
+    });
+
+    it('page=999999999 returns 400', async () => {
+      const upload = await seedUpload(uploads);
+      const response = await ctx.app.inject({
+        method: 'GET',
+        url: `${API}/uploads/${upload.id}/results?page=999999999`,
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json<{ error: { code: string } }>().error.code).toBe('VALIDATION_ERROR');
     });
 
     it('limit=501 returns 400', async () => {

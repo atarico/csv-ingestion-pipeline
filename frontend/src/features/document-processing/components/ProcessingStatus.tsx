@@ -12,7 +12,7 @@ export function ProcessingStatus({ upload }: { upload: UploadDto }) {
 
   return (
     <div className="space-y-3">
-      <StatusBadge status={upload.status} />
+      <StatusBadge status={upload.status} announce />
       {upload.status === 'PENDING' ? <p className="text-sm text-slate-600">En espera de procesamiento…</p> : null}
       {upload.status === 'PROCESSING' ? (
         <div className="space-y-2">

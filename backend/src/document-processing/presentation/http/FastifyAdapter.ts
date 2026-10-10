@@ -1,4 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { ValidationError } from '../../../shared/domain/DomainError.js';
 import type { IHttpRequest } from '../../../shared/infrastructure/http/IHttpRequest.js';
 import type { IHttpResponse } from '../../../shared/infrastructure/http/IHttpResponse.js';
 
@@ -26,6 +27,11 @@ export async function toHttpRequest(
   if (options?.multipart === true) {
     const part = await request.file();
     if (part) {
+      if (part.fieldname !== 'file') {
+        throw new ValidationError('The file must be sent in the multipart field "file"', [
+          { field: 'file', message: 'must be provided as multipart field "file"' },
+        ]);
+      }
       const content = await part.toBuffer();
       httpRequest.file = {
         fileName: part.filename,

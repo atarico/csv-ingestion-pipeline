@@ -112,6 +112,7 @@ export class ProcessFileCommandHandler implements ICommandHandler<
         await this.activityDataRepository.saveMany(batch);
         processed += batch.length;
         batch = [];
+        // Cannot be a Left: startProcessing succeeded above and nothing else changes the status.
         upload.recordProgress(processed, failed);
         await this.uploadRepository.save(upload);
       }

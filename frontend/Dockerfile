@@ -15,6 +15,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 # Bind on all interfaces (Next otherwise binds to the container hostname only, so loopback healthchecks fail).
 ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static

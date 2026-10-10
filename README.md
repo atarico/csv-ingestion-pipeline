@@ -78,7 +78,9 @@ docker compose --profile app rm -f api worker frontend migrate
 (los volúmenes se conservan).
 
 `NEXT_PUBLIC_API_URL` se incrusta en el frontend en tiempo de build y apunta a
-`http://localhost:4000/api/v1`, porque es el navegador (en el host) quien llama a la API.
+`http://localhost:4000/api/v1`, porque es el navegador (en el host) quien llama a la API. Como queda fijado en la imagen,
+cambiarla exige reconstruirla (`--build`, o `--build-arg NEXT_PUBLIC_API_URL=...`); reiniciar
+el contenedor no basta.
 
 ### Variables de entorno
 
@@ -490,7 +492,8 @@ existan en la base. Cubren: el CSV válido (`sample-data.csv`, 60 filas) hasta
 "Completado" y su aparición en la lista; `samples/sample-with-errors.csv` (19 filas
 válidas, 6 con error, errores por fila visibles); `samples/invalid-header.csv`
 ("Fallido" con `Invalid CSV header: missing [date]`); y el rechazo en el cliente de un
-archivo que no es `.csv`. En fallo se genera `e2e/playwright-report/`.
+archivo que no es `.csv`. El informe HTML se genera siempre en `e2e/playwright-report/`;
+CI solo lo sube como artefacto cuando las pruebas fallan.
 
 CI: el workflow `.github/workflows/ci.yml` define un job `backend` (generate, lint,
 typecheck, unitarias, integración con PostgreSQL, build) un job `frontend` (lint,
