@@ -15,16 +15,25 @@ export function UploadForm() {
 
   const selectFile = (candidate: File | undefined) => {
     reset();
-    if (!candidate) return;
-    setFile(candidate);
+    setFile(candidate ?? null);
+    if (!candidate) {
+      setValidationError(null);
+      return;
+    }
     setValidationError(validateCsvFile(candidate));
   };
 
-  const handleChange = (event: ChangeEvent<HTMLInputElement>) => selectFile(event.target.files?.[0]);
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const candidate = event.target.files?.[0];
+    // Clear the input so choosing the same file again still fires `change`.
+    event.target.value = '';
+    selectFile(candidate);
+  };
 
   const handleDrop = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     setIsDragging(false);
+    if (isPending) return;
     selectFile(event.dataTransfer.files[0]);
   };
 
@@ -45,7 +54,7 @@ export function UploadForm() {
           htmlFor="csv-file"
           onDragOver={(event) => {
             event.preventDefault();
-            setIsDragging(true);
+            if (!isPending) setIsDragging(true);
           }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
