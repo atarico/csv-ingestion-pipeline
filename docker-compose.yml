@@ -37,6 +37,55 @@ services:
       timeout: 5s
       retries: 20
 
+  migrate:
+    profiles: ["app"]
+    build:
+      context: ./backend
+      target: build
+    command: ["npx", "prisma", "migrate", "deploy"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/document_processing
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    profiles: ["app"]
+    build:
+      context: ./backend
+    ports:
+      - "4000:4000"
+    env_file: ./backend/.env.docker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      localstack:
+        condition: service_healthy
+
+  worker:
+    profiles: ["app"]
+    build:
+      context: ./backend
+    command: ["node", "dist/workers/index.js"]
+    env_file: ./backend/.env.docker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      localstack:
+        condition: service_healthy
+
+  frontend:
+    profiles: ["app"]
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
 volumes:
   postgres_data:
   localstack_data:
