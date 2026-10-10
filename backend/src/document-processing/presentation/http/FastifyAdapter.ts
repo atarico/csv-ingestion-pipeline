@@ -4,13 +4,13 @@ import type { IHttpRequest } from '../../../shared/infrastructure/http/IHttpRequ
 import type { IHttpResponse } from '../../../shared/infrastructure/http/IHttpResponse.js';
 
 export interface ToHttpRequestOptions {
-  /** Reads the first multipart file part into memory. */
+  /** Reads the single multipart file part into memory; any other part is rejected. */
   multipart: boolean;
 }
 
 /**
  * Translates a Fastify request into the framework-agnostic IHttpRequest.
- * `request.file()` and `toBuffer()` may reject (invalid content type, size limit); the rejection
+ * `request.parts()` and `toBuffer()` may reject (invalid content type, size limit); the rejection
  * propagates to Fastify's error handler.
  */
 export async function toHttpRequest(
@@ -25,9 +25,10 @@ export async function toHttpRequest(
   };
 
   if (options?.multipart === true) {
-    const part = await request.file();
-    if (part) {
-      if (part.fieldname !== 'file') {
+    // @fastify/multipart reports busboy limit errors (files/fields/parts) only when the iterator
+    // advances, so the parts are iterated to the end instead of reading just the first one.
+    for await (const part of request.parts()) {
+      if (part.type !== 'file' || part.fieldname !== 'file' || httpRequest.file !== undefined) {
         throw new ValidationError('The file must be sent in the multipart field "file"', [
           { field: 'file', message: 'must be provided as multipart field "file"' },
         ]);

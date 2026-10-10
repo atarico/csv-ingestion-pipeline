@@ -35,6 +35,24 @@ function multipartWithoutFile(): { payload: Buffer; headers: Record<string, stri
   };
 }
 
+/** Joins raw multipart parts (in order) into one body, to build bodies with extra parts. */
+function multipartOf(...parts: string[]): { payload: Buffer; headers: Record<string, string> } {
+  const boundary = '----vitest-boundary';
+  const body = parts.map((part) => `--${boundary}\r\n${part}\r\n`).join('');
+  return {
+    payload: Buffer.from(`${body}--${boundary}--\r\n`),
+    headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+  };
+}
+
+const FILE_PART = `Content-Disposition: form-data; name="file"; filename="a.csv"\r\nContent-Type: text/csv\r\n\r\n${CSV}`;
+const TEXT_PART = 'Content-Disposition: form-data; name="note"\r\n\r\nhello';
+
+async function postRawMultipart(ctx: TestApp, ...parts: string[]) {
+  const { payload, headers } = multipartOf(...parts);
+  return ctx.app.inject({ method: 'POST', url: `${API}/uploads`, payload, headers });
+}
+
 async function postUpload(ctx: TestApp, part?: FilePart) {
   const { payload, headers } =
     part === undefined
@@ -189,6 +207,21 @@ describe('Uploads REST API', () => {
       expect(body.error.code).toBe('VALIDATION_ERROR');
       expect(body.error.details[0]?.field).toBe('file');
       expect(await persistedUploadStatuses(ctx)).toEqual([]);
+    });
+
+    it.each([
+      ['two files', [FILE_PART, FILE_PART]],
+      ['a file followed by a text field', [FILE_PART, TEXT_PART]],
+      ['a text field followed by a file', [TEXT_PART, FILE_PART]],
+    ])('with %s returns 400 VALIDATION_ERROR and stores nothing', async (_name, parts) => {
+      const response = await postRawMultipart(ctx, ...parts);
+      expect(response.statusCode).toBe(400);
+      const body = response.json<{ error: { code: string; details: Array<{ field: string }> } }>();
+      expect(body.error.code).toBe('VALIDATION_ERROR');
+      expect(body.error.details[0]?.field).toBe('file');
+      expect(await persistedUploadStatuses(ctx)).toEqual([]);
+      expect(ctx.storage.files.size).toBe(0);
+      expect(ctx.queue.published).toHaveLength(0);
     });
 
     it('with data.txt returns 400 UNSUPPORTED_FILE', async () => {
