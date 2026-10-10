@@ -125,6 +125,16 @@ export class Upload extends AggregateRoot<UploadProps> {
     return Either.right(undefined);
   }
 
+  /** A detached copy of the full state; mutating it never touches this entity. */
+  toProps(): UploadProps {
+    return {
+      ...this.props,
+      rowErrors: this.props.rowErrors.map((error) => ({ ...error })),
+      createdAt: new Date(this.props.createdAt),
+      updatedAt: new Date(this.props.updatedAt),
+    };
+  }
+
   get fileName(): FileName {
     return this.props.fileName;
   }
