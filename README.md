@@ -96,7 +96,7 @@ sin secretos reales. El archivo `.env` (no versionado) puede sobrescribirlos.
 | `DATABASE_URL` | (obligatoria) | Conexión a PostgreSQL |
 | `AWS_REGION` | `us-east-1` | Región AWS |
 | `AWS_ENDPOINT` | vacío | Endpoint de AWS; en local, LocalStack (`http://localhost:4566`) |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | `test` / `test` | Credenciales (LocalStack acepta cualquier valor) |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | vacío / vacío | Credenciales estáticas, opcionales y todo-o-nada (ambas o ninguna; si solo una está definida la configuración falla). En local, LocalStack acepta cualquier valor (`test` / `test`). En AWS déjalas vacías para usar el rol IAM de la tarea |
 | `S3_BUCKET` | `document-processing` | Bucket de los CSV |
 | `S3_FORCE_PATH_STYLE` | `true` | Necesario para LocalStack |
 | `SQS_QUEUE_URL` | (obligatoria) | URL de la cola `file-processing` |

@@ -8,6 +8,8 @@ const MANAGED_KEYS = [
   'DATABASE_URL',
   'SQS_QUEUE_URL',
   'AWS_ENDPOINT',
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
   'DEFAULT_USER_ID',
   'WORKER_RETRY_BACKOFF_BASE_SECONDS',
 ] as const;
@@ -62,6 +64,19 @@ describe('loadConfig', () => {
     const config = loadConfig({ envFiles: false });
 
     expect(config.aws.endpoint).toBeNull();
+  });
+
+  it('defaults the aws keys to empty so the default credential chain applies', () => {
+    const config = loadConfig({ envFiles: false });
+
+    expect(config.aws.accessKeyId).toBe('');
+    expect(config.aws.secretAccessKey).toBe('');
+  });
+
+  it('rejects only one of the two aws keys', () => {
+    process.env['AWS_ACCESS_KEY_ID'] = 'test';
+
+    expect(() => loadConfig({ envFiles: false })).toThrow(/AWS_ACCESS_KEY_ID.*AWS_SECRET_ACCESS_KEY/);
   });
 
   it('rejects an invalid LOG_LEVEL', () => {
