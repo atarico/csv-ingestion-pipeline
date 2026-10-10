@@ -57,6 +57,7 @@ services:
     ports:
       - "4000:4000"
     env_file: ./backend/.env.docker
+    stop_grace_period: 15s
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -69,6 +70,7 @@ services:
       context: ./backend
     command: ["node", "dist/workers/index.js"]
     env_file: ./backend/.env.docker
+    stop_grace_period: 30s
     depends_on:
       migrate:
         condition: service_completed_successfully

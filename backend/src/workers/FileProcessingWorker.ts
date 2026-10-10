@@ -29,9 +29,11 @@ interface MessageContext {
  */
 export class FileProcessingWorker {
   private readonly pollBackoff: ExponentialBackoff;
-  private readonly sleep: (ms: number) => Promise<void>;
+  private readonly sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
   private readonly log: ILogger;
   private stopped = false;
+  /** One per start(); stop() aborts it to cut the long poll and the backoff sleep short. */
+  private abortController = new AbortController();
 
   constructor(
     private readonly messageConsumer: IMessageConsumer,
@@ -52,26 +54,30 @@ export class FileProcessingWorker {
 
   /** Loops processOnce() until stop(); resolves after the in-flight cycle ends. */
   async start(): Promise<void> {
+    this.abortController = new AbortController();
     this.log.info({ queueUrl: this.workerPolicy.sqsQueueUrl }, 'Worker started');
     while (!this.stopped) {
       await this.processOnce();
     }
   }
 
+  /** An in-flight handleMessage is never aborted: it finishes, then the loop exits. */
   stop(): void {
     this.stopped = true;
+    this.abortController.abort();
   }
 
   /** One receive cycle: receive, then handle every message sequentially. */
   async processOnce(): Promise<void> {
+    const { signal } = this.abortController;
     let messages: ReceivedMessage[];
     try {
-      messages = await this.messageConsumer.receive();
+      messages = await this.messageConsumer.receive(signal);
       this.pollBackoff.reset();
     } catch (error) {
       const delayMs = this.pollBackoff.nextDelayMs();
       this.log.error({ err: error, delayMs }, 'Receive failed, backing off');
-      await this.sleep(delayMs);
+      await this.sleep(delayMs, signal);
       return;
     }
     for (const message of messages) {
