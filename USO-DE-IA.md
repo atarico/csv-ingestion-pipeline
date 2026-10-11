@@ -23,9 +23,10 @@ especificación. El agente principal (modelo Opus 5.5) delegó cada capa en sub-
 (modelo Sonnet), que escribieron primero las pruebas y las vieron fallar, implementaron
 hasta que pasaran y ejecutaron `lint`, `typecheck` y las pruebas antes de cada commit. Se
 usó una rama por capa (`feat/01-foundations` a `docs/10-deliverables`), unida a `main` con
-`git merge --no-ff`, y commits convencionales atómicos. Después de cada commit, la
-herramienta de orquestación ejecutó una revisión de código automática, con mi
-consentimiento (en la ronda de correcciones concedí todos los avisos). Sus hallazgos
+`git merge --no-ff`, y commits convencionales atómicos. La herramienta de
+orquestación evaluaba el riesgo de cada commit y, cuando un grupo de commits era de riesgo
+alto o sumaba unas 400 líneas, ejecutaba una revisión de código automática con mi
+consentimiento (en la ronda de correcciones acepté todas las revisiones propuestas). Sus hallazgos
 no bloqueantes que no se corrigieron están en el README, en "Limitaciones conocidas".
 Además de este documento, recibí un informe didáctico por capa (fuera del repositorio).
 
@@ -34,7 +35,7 @@ revisores de código, una evaluación con rúbrica y un verificador que ejecutó
 comprobación; produjo `informes/11-revision-completa.md` (fuera del repositorio). A partir
 de ese informe solicité una ronda de correcciones, que Claude Code aplicó en la rama
 `fix/12-review-followups` con un commit por tarea, pruebas primero y una revisión
-automática después de cada commit.
+automática por cada grupo de commits.
 
 ## Qué se generó con IA
 
@@ -194,7 +195,7 @@ con un cronómetro; solo se comprobó que el polling del detalle ocurre cada 3 s
 | `docker compose --profile app up --build` en el clon | curl y Chromium headless | `/health` devuelve `{"status":"ok"}`, el frontend responde y el flujo completo (muestra, errores, cabecera inválida y archivo grande) funciona contra los contenedores |
 | CI verde en `main` e insignia | Ejecución de CI en GitHub | En la capa 10 no se pudo comprobar (sin remoto). Tras publicar, la primera ejecución (2026-10-10) fue verde: [ejecución 38084387707](https://github.com/atarico/csv-ingestion-pipeline/actions/runs/38084387707). |
 | `git log` con commits convencionales y sin trailers de atribución; sin `.env` versionado | `git log`, `git ls-files` | Cumple |
-| `docs/arquitectura-aws.png`, `docs/arquitectura-aws.md`, `docs/flujo.md` | `stat`, lectura de la imagen y render de `flujo.md` con `mermaid-cli` | El PNG pesa 242 915 bytes y se ve legible; ambos diagramas se renderizan |
+| `docs/arquitectura-aws.png`, `docs/arquitectura-aws.md`, `docs/flujo.md` | `stat`, lectura de la imagen y render de `flujo.md` con `mermaid-cli` | El PNG pesa 310 953 bytes (regenerado tras publicar) y se ve legible; ambos diagramas se renderizan |
 | `sample-data.csv` | `rg -c ""` | 61 líneas (cabecera y 60 filas) |
 | Pruebas en el clon | `npm run test:unit`, `test:integration`, `test:coverage`, frontend `npm test` | 161 unitarias (22 archivos), 33 de integración (3 archivos), 20 del frontend; cobertura de líneas global 85,37 % (cifras de la capa 10; ver README para las actuales) |
 

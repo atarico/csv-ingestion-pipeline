@@ -80,7 +80,7 @@ a partir de él con `minlag/mermaid-cli` (ver el comando al final de este archiv
 | Secrets Manager | `DATABASE_URL` y secretos de la aplicación inyectados en las definiciones de tarea | Sin secretos en imágenes ni en archivos de entorno |
 | Roles de tarea IAM | API: S3 `PutObject` sobre el bucket y SQS `SendMessage` sobre la cola. Worker: S3 `GetObject` sobre el bucket y SQS `ReceiveMessage`, `DeleteMessage` y `ChangeMessageVisibility` sobre la cola | Mínimo privilegio por servicio; los reintentos dependen de `ChangeMessageVisibility` |
 | Endpoints de VPC | Endpoint gateway para S3; endpoints de interfaz para SQS, Secrets Manager y CloudWatch | Las tareas privadas llegan a los servicios de AWS sin pasar por el NAT |
-| Security groups | ALB: 443 desde Internet; frontend: 3000 solo desde el ALB; API: 4000 solo desde el ALB; worker: sin entrada; RDS: 5432 solo desde API y worker; endpoints de interfaz: 443 desde API y worker | Mínimo privilegio en red |
+| Security groups | ALB: 443 desde Internet; frontend: 3000 solo desde el ALB; API: 4000 solo desde el ALB; worker: sin entrada; RDS: 5432 solo desde API y worker; endpoints de interfaz: 443 desde frontend, API y worker | Mínimo privilegio en red |
 
 ## Ruta de una petición
 
