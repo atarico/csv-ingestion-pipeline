@@ -596,7 +596,7 @@ que los clientes anteriores siguen funcionando. `GET /api/v1/uploads/:id` añade
 | Backend, unitarias | `npm run test:unit` | 202 pruebas; sin infraestructura |
 | Backend, integración | `npm run test:integration` | 45 pruebas; necesitan PostgreSQL (`docker compose up -d`); usan una base `document_processing_test` y no tocan S3 ni SQS |
 | Frontend | `cd frontend && npm test` | 146 pruebas |
-| Cobertura | `npm run test:coverage` | líneas: global 85,84 % |
+| Cobertura | `npm run test:coverage` | líneas: global 86,31 % |
 
 Las pruebas se escribieron antes que el código en cada capa. Los adaptadores de S3 y SQS no
 tienen pruebas unitarias (ver "Limitaciones conocidas").
