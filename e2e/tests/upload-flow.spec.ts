@@ -6,6 +6,9 @@ test.describe('CSV upload flow', () => {
     const name = uniqueName('sample-data');
     await uploadCsv(page, name, sampleFile('sample-data.csv'));
 
+    await expect(
+      page.getByText('El archivo se subió correctamente. El procesamiento empieza en segundos y esta página se actualiza sola.'),
+    ).toBeVisible();
     await expectStatus(page, 'Completado');
     await expect(page.getByText('Filas procesadas: 60 · Filas con errores: 0')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Datos procesados' })).toBeVisible();
@@ -68,6 +71,7 @@ test.describe('CSV upload flow', () => {
     await selectFile(page, name, Buffer.from('not,a,csv\n'), 'text/plain');
 
     await expect(page.getByRole('alert').filter({ hasText: 'El archivo debe' })).toHaveText('El archivo debe tener extensión .csv');
+    await expect(page.getByRole('group', { name: 'Archivo seleccionado' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Subir' })).toBeDisabled();
     expect(uploadRequests).toBe(0);
 

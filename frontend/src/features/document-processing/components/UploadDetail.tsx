@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { CheckCircleIcon, XIcon } from '@/shared/components/icons';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { getApiErrorMessage } from '@/shared/lib/api-client';
 import { formatDateTime } from '@/shared/lib/format';
-import { useUpload, useUploadResults } from '../api/uploadsApi';
+import { JUST_UPLOADED_KEY, useUpload, useUploadResults } from '../api/uploadsApi';
 import { ProcessingStatus } from './ProcessingStatus';
 import { ResultsTable } from './ResultsTable';
 import { RowErrorsTable } from './RowErrorsTable';
@@ -15,6 +16,20 @@ export function UploadDetail({ id }: { id: string }) {
   const [page, setPage] = useState(1);
   const { data: upload, isPending, isError, error, refetch } = useUpload(id);
   const results = useUploadResults(id, page, upload?.status === 'COMPLETED');
+  const [showBanner, setShowBanner] = useState(false);
+
+  // Read in an effect (the component is SSR-rendered); only ever sets true, as StrictMode runs effects twice.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(JUST_UPLOADED_KEY) === id) {
+        sessionStorage.removeItem(JUST_UPLOADED_KEY);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage only exists after hydration
+        setShowBanner(true);
+      }
+    } catch {
+      // Storage unavailable: no banner.
+    }
+  }, [id]);
 
   return (
     <section className="space-y-6">
@@ -24,6 +39,26 @@ export function UploadDetail({ id }: { id: string }) {
           Volver a la lista
         </Button>
       </div>
+
+      {showBanner ? (
+        <div
+          role="status"
+          className="flex animate-card-in items-start gap-3 rounded-card border border-accent/30 bg-accent-soft p-4 text-accent motion-reduce:animate-none"
+        >
+          <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0" />
+          <p className="flex-1 text-sm font-medium">
+            El archivo se subió correctamente. El procesamiento empieza en segundos y esta página se actualiza sola.
+          </p>
+          <button
+            type="button"
+            aria-label="Cerrar aviso"
+            onClick={() => setShowBanner(false)}
+            className="rounded-full p-1 transition-colors duration-150 hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/40 motion-reduce:transition-none"
+          >
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
 
       {isPending ? <LoadingSpinner /> : null}
       {isError ? <ErrorAlert message={getApiErrorMessage(error)} onRetry={() => void refetch()} /> : null}

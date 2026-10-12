@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, type ChangeEvent, type DragEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { Button } from '@/shared/components/Button';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { UploadIcon } from '@/shared/components/icons';
+import { CheckCircleIcon, FileIcon, UploadIcon } from '@/shared/components/icons';
 import { ProgressBar } from '@/shared/components/ProgressBar';
 import { getApiErrorMessage } from '@/shared/lib/api-client';
+import { formatBytes } from '@/shared/lib/format';
 import { useCreateUpload } from '../api/uploadsApi';
 import { validateCsvFile } from '../lib/validateCsvFile';
 
@@ -13,16 +15,17 @@ export function UploadForm() {
   const [file, setFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { mutate, isPending, isError, error, reset, progress } = useCreateUpload();
 
   const selectFile = (candidate: File | undefined) => {
+    if (!candidate) return;
     reset();
-    setFile(candidate ?? null);
-    if (!candidate) {
-      setValidationError(null);
-      return;
-    }
-    setValidationError(validateCsvFile(candidate));
+    const error = validateCsvFile(candidate);
+    setValidationError(error);
+    // An invalid file never becomes the selection; a previous valid one is kept.
+    if (error === null) setFile(candidate);
   };
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -32,14 +35,19 @@ export function UploadForm() {
     selectFile(candidate);
   };
 
-  const handleDrop = (event: DragEvent<HTMLLabelElement>) => {
+  const handleDragOver = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    if (!isPending) setIsDragging(true);
+  };
+
+  const handleDrop = (event: DragEvent<HTMLElement>) => {
     event.preventDefault();
     setIsDragging(false);
     if (isPending) return;
     selectFile(event.dataTransfer.files[0]);
   };
 
-  const canSubmit = file !== null && validationError === null && !isPending;
+  const canSubmit = file !== null && !isPending;
 
   return (
     <section className="mx-auto max-w-xl space-y-5">
@@ -49,37 +57,62 @@ export function UploadForm() {
         className="space-y-4"
         onSubmit={(event) => {
           event.preventDefault();
-          if (file && canSubmit) mutate(file);
+          if (canSubmit) setConfirmOpen(true);
         }}
       >
-        <label
-          htmlFor="csv-file"
-          onDragOver={(event) => {
-            event.preventDefault();
-            if (!isPending) setIsDragging(true);
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={handleDrop}
-          className={`flex cursor-pointer flex-col items-center gap-2 rounded-card border-2 border-dashed p-8 text-center transition-colors duration-150 ease-brand motion-reduce:transition-none focus-within:ring-[3px] focus-within:ring-accent/40 ${
-            isDragging ? 'border-accent bg-accent-soft' : 'border-line-strong bg-surface hover:bg-primary-soft/40'
-          }`}
-        >
-          <UploadIcon className="h-8 w-8 text-primary" />
-          <span className="font-medium text-ink">
-            Arrastra y suelta un archivo CSV aquí, o haz clic para seleccionarlo
-          </span>
-          <span className="text-sm text-ink-muted">Solo se permiten archivos .csv de hasta 5 MB</span>
-          <input
-            id="csv-file"
-            type="file"
-            accept=".csv,text/csv"
-            onChange={handleChange}
-            disabled={isPending}
-            className="sr-only"
-          />
-        </label>
+        <input
+          ref={inputRef}
+          id="csv-file"
+          type="file"
+          accept=".csv,text/csv"
+          aria-label="Arrastra y suelta un archivo CSV aquí, o haz clic para seleccionarlo"
+          onChange={handleChange}
+          disabled={isPending}
+          className="peer sr-only"
+        />
 
-        {file ? <p className="text-sm text-ink-muted">Archivo seleccionado: {file.name}</p> : null}
+        {file ? (
+          <div
+            role="group"
+            aria-label="Archivo seleccionado"
+            onDragOver={handleDragOver}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            className={`flex animate-card-in flex-wrap items-center gap-4 rounded-card border p-5 transition-colors duration-150 ease-brand motion-reduce:animate-none motion-reduce:transition-none ${
+              isDragging ? 'border-accent bg-accent-soft' : 'border-accent/40 bg-surface'
+            }`}
+          >
+            <div className="relative shrink-0">
+              <FileIcon className="h-10 w-10 text-primary" />
+              <CheckCircleIcon className="absolute -bottom-1 -right-2 h-5 w-5 rounded-full bg-surface text-accent" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <strong className="block break-all font-semibold text-ink">{file.name}</strong>
+              <span className="block text-sm text-ink-muted">{formatBytes(file.size)}</span>
+              <span className="block text-sm font-medium text-accent">Archivo listo para procesar</span>
+            </div>
+            <Button variant="secondary" disabled={isPending} onClick={() => inputRef.current?.click()}>
+              Cambiar archivo
+            </Button>
+          </div>
+        ) : (
+          <label
+            htmlFor="csv-file"
+            onDragOver={handleDragOver}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            className={`flex cursor-pointer flex-col items-center gap-2 rounded-card border-2 border-dashed p-8 text-center transition-colors duration-150 ease-brand motion-reduce:transition-none peer-focus-visible:ring-[3px] peer-focus-visible:ring-accent/40 ${
+              isDragging ? 'border-accent bg-accent-soft' : 'border-line-strong bg-surface hover:bg-primary-soft/40'
+            }`}
+          >
+            <UploadIcon className="h-8 w-8 text-primary" />
+            <span className="font-medium text-ink">
+              Arrastra y suelta un archivo CSV aquí, o haz clic para seleccionarlo
+            </span>
+            <span className="text-sm text-ink-muted">Solo se permiten archivos .csv de hasta 5 MB</span>
+          </label>
+        )}
+
         {validationError ? (
           <p role="alert" className="text-sm font-medium text-danger">
             {validationError}
@@ -99,6 +132,23 @@ export function UploadForm() {
           Subir
         </Button>
       </form>
+
+      {file ? (
+        <ConfirmDialog
+          open={confirmOpen}
+          title="¿Procesar el archivo?"
+          confirmLabel="Sí, procesar"
+          cancelLabel="Cancelar"
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={() => {
+            setConfirmOpen(false);
+            mutate(file);
+          }}
+        >
+          Se va a subir y procesar «{file.name}» ({formatBytes(file.size)}). Podrás seguir el avance en la página de
+          detalle.
+        </ConfirmDialog>
+      ) : null}
     </section>
   );
 }
