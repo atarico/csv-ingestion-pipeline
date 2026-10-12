@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { BrandLogo } from './BrandLogo';
+import { ThemeToggle } from '@/shared/theme/ThemeToggle';
 import { NavLinks } from './NavLinks';
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -18,8 +19,9 @@ export function Layout({ children }: { children: ReactNode }) {
             </span>
           </Link>
           <NavLinks />
-          {/* Slot for the theme toggle (task T3). */}
-          <div className="ml-auto flex items-center" data-slot="theme-toggle" />
+          <div className="ml-auto flex items-center" data-slot="theme-toggle">
+            <ThemeToggle />
+          </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
