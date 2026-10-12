@@ -31,5 +31,12 @@ export function validateHeader(normalizedHeaders: string[]): Either<CsvFormatErr
   if (duplicated.length > 0) parts.push(`duplicated columns: ${render(duplicated)}`);
 
   if (parts.length === 0) return Either.right(undefined);
-  return Either.left(new CsvFormatError(`Invalid CSV header: ${parts.join(', ')}`));
+  return Either.left(
+    new CsvFormatError(`Invalid CSV header: ${parts.join(', ')}`, 'INVALID_HEADER', {
+      expected: [...CSV_REQUIRED_COLUMNS],
+      missing,
+      unexpected,
+      duplicated,
+    }),
+  );
 }

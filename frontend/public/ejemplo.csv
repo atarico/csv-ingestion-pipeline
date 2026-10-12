@@ -1,0 +1,6 @@
+category,amount,unit,date
+Electricity,150.5,kWh,2024-01-15
+Natural Gas,75.2,m3,2024-01-16
+Transportation,200,km,2024-01-17
+Waste,45.8,kg,2024-01-18
+Water,120,m3,2024-01-19

@@ -33,6 +33,18 @@ describe('Amount', () => {
     expect(message('0.0')).toBe('amount must be greater than 0');
   });
 
+  it('reports a code per message', () => {
+    const code = (raw: unknown): string | undefined => {
+      const result = Amount.create(raw);
+      return result.isLeft() ? result.value.fieldErrors[0]?.code : undefined;
+    };
+    expect(code('')).toBe('REQUIRED');
+    expect(code(undefined)).toBe('REQUIRED');
+    expect(code('abc')).toBe('INVALID_NUMBER');
+    expect(code('1.23456')).toBe('INVALID_NUMBER');
+    expect(code('0.0')).toBe('NOT_POSITIVE');
+  });
+
   it('uses the given field name', () => {
     const result = Amount.create('abc', 'quantity');
     expect(result.isLeft() && result.value.fieldErrors[0]?.field).toBe('quantity');

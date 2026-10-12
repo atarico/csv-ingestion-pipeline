@@ -1,12 +1,13 @@
 // Mirror of backend/src/document-processing/application/dtos (document 04).
 export type UploadStatusValue = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
-export interface RowErrorDto { row: number; field?: string; message: string }
+export interface RowErrorDto { row: number; field?: string; code: string; message: string; value?: string }
 
 export interface UploadDto {
   id: string; fileName: string; status: UploadStatusValue;
   totalRows: number | null; processedRows: number | null; failedRows: number | null;
-  errorMessage: string | null; rowErrors: RowErrorDto[];
+  errorMessage: string | null; errorCode: string | null; errorDetails: Record<string, unknown> | null;
+  rowErrors: RowErrorDto[];
   createdAt: string; updatedAt: string;
 }
 

@@ -13,11 +13,11 @@ export function ProcessingStatus({ upload }: { upload: UploadDto }) {
   return (
     <div className="space-y-3">
       <StatusBadge status={upload.status} announce />
-      {upload.status === 'PENDING' ? <p className="text-sm text-slate-600">En espera de procesamiento…</p> : null}
+      {upload.status === 'PENDING' ? <p className="text-sm text-ink-muted">En espera de procesamiento…</p> : null}
       {upload.status === 'PROCESSING' ? (
         <div className="space-y-2">
           <ProgressBar value={percent} label="Progreso de procesamiento" />
-          <p className="text-sm text-slate-700">
+          <p className="text-sm text-ink-muted">
             Procesando {done} de {total} filas
           </p>
         </div>

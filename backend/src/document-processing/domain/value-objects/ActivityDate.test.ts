@@ -35,6 +35,17 @@ describe('ActivityDate', () => {
     expect(message('2024-02-30')).toBe('date is not a valid calendar date');
   });
 
+  it('reports a code per message', () => {
+    const code = (raw: unknown): string | undefined => {
+      const result = ActivityDate.create(raw);
+      return result.isLeft() ? result.value.fieldErrors[0]?.code : undefined;
+    };
+    expect(code('  ')).toBe('REQUIRED');
+    expect(code(undefined)).toBe('REQUIRED');
+    expect(code('15/01/2024')).toBe('INVALID_DATE_FORMAT');
+    expect(code('2024-02-30')).toBe('INVALID_DATE');
+  });
+
   it('toDate is UTC midnight', () => {
     const result = ActivityDate.create('2024-01-15');
     expect(result.isRight() && result.value.toDate().toISOString()).toBe(

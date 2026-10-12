@@ -12,25 +12,25 @@ interface ResultsTableProps {
 export function ResultsTable({ rows, page, totalPages, onPageChange }: ResultsTableProps) {
   return (
     <div>
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-        <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-          <thead className="bg-slate-50 text-slate-600">
+      <div className="overflow-x-auto rounded-card border border-line bg-surface shadow-card">
+        <table className="min-w-full text-left text-sm">
+          <thead className="bg-bg text-xs uppercase tracking-wide text-ink-muted">
             <tr>
-              <th scope="col" className="px-4 py-3 font-medium">Fila</th>
-              <th scope="col" className="px-4 py-3 font-medium">Categoría</th>
+              <th scope="col" className="px-4 py-3 font-semibold">Fila</th>
+              <th scope="col" className="px-4 py-3 font-semibold">Categoría</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">Cantidad</th>
-              <th scope="col" className="px-4 py-3 font-medium">Unidad</th>
-              <th scope="col" className="px-4 py-3 font-medium">Fecha</th>
+              <th scope="col" className="px-4 py-3 font-semibold">Unidad</th>
+              <th scope="col" className="px-4 py-3 font-semibold">Fecha</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody>
             {rows.map((row) => (
-              <tr key={row.id}>
-                <td className="px-4 py-2 tabular-nums text-slate-600">{row.rowNumber}</td>
-                <td className="px-4 py-2 text-slate-900">{row.category}</td>
-                <td className="px-4 py-2 text-right tabular-nums text-slate-900">{formatNumber(row.amount)}</td>
-                <td className="px-4 py-2 text-slate-700">{row.unit}</td>
-                <td className="px-4 py-2 tabular-nums text-slate-700">{row.date}</td>
+              <tr className="border-t border-line transition-colors duration-150 hover:bg-primary-soft/40 motion-reduce:transition-none" key={row.id}>
+                <td className="px-4 py-2 tabular-nums text-ink-muted">{row.rowNumber}</td>
+                <td className="px-4 py-2 text-ink">{row.category}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-ink">{formatNumber(row.amount)}</td>
+                <td className="px-4 py-2 text-ink-muted">{row.unit}</td>
+                <td className="px-4 py-2 tabular-nums text-ink-muted">{row.date}</td>
               </tr>
             ))}
           </tbody>

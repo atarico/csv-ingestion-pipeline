@@ -37,6 +37,19 @@ describe('CsvHeaderPolicy', () => {
     });
   });
 
+  it('fills the failure code and details', () => {
+    const result = validateHeader(['category', 'amount', 'amount', 'notes']);
+    expect(result.value).toMatchObject({
+      failureCode: 'INVALID_HEADER',
+      failureDetails: {
+        expected: ['category', 'amount', 'unit', 'date'],
+        missing: ['unit', 'date'],
+        unexpected: ['notes'],
+        duplicated: ['amount'],
+      },
+    });
+  });
+
   it('empty header lists every column as missing', () => {
     const result = validateHeader([]);
     expect(result.value).toMatchObject({

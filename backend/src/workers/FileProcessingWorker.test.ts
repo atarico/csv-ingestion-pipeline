@@ -172,6 +172,7 @@ describe('FileProcessingWorker', () => {
     expect(outcome).toBe('dead-lettered');
     expect(stored?.status.value).toBe('FAILED');
     expect(stored?.errorMessage).toContain('after 3 attempts');
+    expect(stored?.errorCode).toBe('PROCESSING_ERROR');
     expect(queue.inFlightCount).toBe(1);
     expect(queue.visibilityChanges).toHaveLength(0);
   });

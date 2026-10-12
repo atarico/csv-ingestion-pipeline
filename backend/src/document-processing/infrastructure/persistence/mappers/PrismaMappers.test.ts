@@ -15,7 +15,27 @@ function buildUpload(): Upload {
   upload.complete({
     processedRows: 2,
     failedRows: 1,
-    rowErrors: [{ row: 3, field: 'amount', message: 'amount must be greater than 0' }],
+    rowErrors: [
+      {
+        row: 3,
+        field: 'amount',
+        code: 'NOT_POSITIVE',
+        message: 'amount must be greater than 0',
+        value: '-4',
+      },
+    ],
+  });
+  return upload;
+}
+
+function buildFailedUpload(): Upload {
+  const fileName = FileName.create('bad.csv');
+  if (fileName.isLeft()) throw fileName.value;
+  const upload = Upload.create({ fileName: fileName.value, userId: 'user-123' });
+  upload.fail({
+    code: 'INVALID_HEADER',
+    message: 'Invalid CSV header: missing [date]',
+    details: { missing: ['date'], expected: ['category', 'amount', 'unit', 'date'] },
   });
   return upload;
 }
@@ -27,6 +47,7 @@ describe('PrismaUploadMapper', () => {
     const persisted = PrismaUploadMapper.toPersistence(upload);
     const restored = PrismaUploadMapper.toDomain({
       ...persisted,
+      errorDetails: null,
       rowErrors: persisted.rowErrors as UploadRecord['rowErrors'],
       updatedAt: upload.updatedAt,
     });
@@ -41,9 +62,76 @@ describe('PrismaUploadMapper', () => {
     expect(restored.failedRows).toBe(1);
     expect(restored.errorMessage).toBeNull();
     expect(restored.rowErrors).toEqual([
-      { row: 3, field: 'amount', message: 'amount must be greater than 0' },
+      {
+        row: 3,
+        field: 'amount',
+        code: 'NOT_POSITIVE',
+        message: 'amount must be greater than 0',
+        value: '-4',
+      },
     ]);
+    expect(restored.errorCode).toBeNull();
+    expect(restored.errorDetails).toBeNull();
     expect(restored.createdAt).toEqual(upload.createdAt);
+  });
+
+  it('round-trips errorCode and errorDetails', () => {
+    const upload = buildFailedUpload();
+
+    const persisted = PrismaUploadMapper.toPersistence(upload);
+    expect(persisted.errorCode).toBe('INVALID_HEADER');
+    expect(persisted.errorDetails).toEqual({
+      missing: ['date'],
+      expected: ['category', 'amount', 'unit', 'date'],
+    });
+    const restored = PrismaUploadMapper.toDomain({
+      ...persisted,
+      errorDetails: persisted.errorDetails as UploadRecord['errorDetails'],
+      rowErrors: persisted.rowErrors as UploadRecord['rowErrors'],
+      updatedAt: upload.updatedAt,
+    });
+
+    expect(restored.errorCode).toBe('INVALID_HEADER');
+    expect(restored.errorDetails).toEqual({
+      missing: ['date'],
+      expected: ['category', 'amount', 'unit', 'date'],
+    });
+  });
+
+  it('writes Prisma.DbNull when there are no errorDetails', () => {
+    const persisted = PrismaUploadMapper.toPersistence(buildUpload());
+
+    expect(persisted.errorCode).toBeNull();
+    expect(persisted.errorDetails).toBe(Prisma.DbNull);
+  });
+
+  it('defaults a stored row error without code to INVALID', () => {
+    const persisted = PrismaUploadMapper.toPersistence(buildUpload());
+    const record: UploadRecord = {
+      ...persisted,
+      errorDetails: null,
+      rowErrors: [{ row: 5, field: 'unit', message: 'unit is required' }],
+      updatedAt: new Date(),
+    };
+
+    expect(PrismaUploadMapper.toDomain(record).rowErrors).toEqual([
+      { row: 5, field: 'unit', code: 'INVALID', message: 'unit is required' },
+    ]);
+  });
+
+  it('loads a record whose errorCode and errorDetails columns are null or malformed', () => {
+    const persisted = PrismaUploadMapper.toPersistence(buildUpload());
+    const base: UploadRecord = {
+      ...persisted,
+      errorDetails: null,
+      rowErrors: [],
+      updatedAt: new Date(),
+    };
+
+    expect(PrismaUploadMapper.toDomain(base).errorDetails).toBeNull();
+    expect(
+      PrismaUploadMapper.toDomain({ ...base, errorDetails: ['not', 'a', 'record'] }).errorDetails,
+    ).toBeNull();
   });
 
   it('writes rowErrors as a plain array, never undefined', () => {
@@ -58,6 +146,7 @@ describe('PrismaUploadMapper', () => {
     const persisted = PrismaUploadMapper.toPersistence(buildUpload());
     const record: UploadRecord = {
       ...persisted,
+      errorDetails: null,
       rowErrors: { not: 'an array' },
       updatedAt: new Date(),
     };
@@ -67,7 +156,12 @@ describe('PrismaUploadMapper', () => {
 
   it('treats a null rowErrors column as []', () => {
     const persisted = PrismaUploadMapper.toPersistence(buildUpload());
-    const record: UploadRecord = { ...persisted, rowErrors: null, updatedAt: new Date() };
+    const record: UploadRecord = {
+      ...persisted,
+      errorDetails: null,
+      rowErrors: null,
+      updatedAt: new Date(),
+    };
 
     expect(PrismaUploadMapper.toDomain(record).rowErrors).toEqual([]);
   });
@@ -76,6 +170,7 @@ describe('PrismaUploadMapper', () => {
     const persisted = PrismaUploadMapper.toPersistence(buildUpload());
     const base = {
       ...persisted,
+      errorDetails: null,
       rowErrors: persisted.rowErrors as UploadRecord['rowErrors'],
       updatedAt: new Date(),
     };

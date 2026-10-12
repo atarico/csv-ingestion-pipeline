@@ -58,17 +58,52 @@ describe('Prisma repositories', () => {
 
     it('persists rowErrors and failure details', async () => {
       const upload = newUpload();
-      upload.fail('Invalid CSV header: missing [date]', {
-        processedRows: 0,
-        failedRows: 1,
-        rowErrors: [{ row: 1, field: 'date', message: 'date is required' }],
-      });
+      upload.fail(
+        {
+          code: 'INVALID_HEADER',
+          message: 'Invalid CSV header: missing [date]',
+          details: { missing: ['date'], expected: ['category', 'amount', 'unit', 'date'] },
+        },
+        {
+          processedRows: 0,
+          failedRows: 1,
+          rowErrors: [
+            { row: 1, field: 'date', code: 'REQUIRED', message: 'date is required', value: 'x' },
+          ],
+        },
+      );
       await uploads.save(upload);
 
       const stored = await uploads.findById(upload.id);
       expect(stored?.status.value).toBe('FAILED');
       expect(stored?.errorMessage).toBe('Invalid CSV header: missing [date]');
-      expect(stored?.rowErrors).toEqual([{ row: 1, field: 'date', message: 'date is required' }]);
+      expect(stored?.errorCode).toBe('INVALID_HEADER');
+      expect(stored?.errorDetails).toEqual({
+        missing: ['date'],
+        expected: ['category', 'amount', 'unit', 'date'],
+      });
+      expect(stored?.rowErrors).toEqual([
+        { row: 1, field: 'date', code: 'REQUIRED', message: 'date is required', value: 'x' },
+      ]);
+    });
+
+    it('clears errorCode and errorDetails when a failed record is saved as healthy', async () => {
+      const upload = newUpload();
+      upload.fail({ code: 'PROCESSING_ERROR', message: 'boom', details: { attempts: 3 } });
+      await uploads.save(upload);
+      expect((await uploads.findById(upload.id))?.errorDetails).toEqual({ attempts: 3 });
+
+      const healthy = Upload.reconstitute(upload.id, {
+        ...upload.toProps(),
+        errorMessage: null,
+        errorCode: null,
+        errorDetails: null,
+      });
+      await uploads.save(healthy);
+
+      const stored = await uploads.findById(upload.id);
+      expect(stored?.errorCode).toBeNull();
+      expect(stored?.errorDetails).toBeNull();
     });
 
     it('findById returns null for unknown', async () => {

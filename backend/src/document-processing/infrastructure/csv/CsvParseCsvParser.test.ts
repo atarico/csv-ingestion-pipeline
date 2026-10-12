@@ -53,6 +53,15 @@ describe('CsvParseCsvParser', () => {
     expect(result.isLeft()).toBe(true);
     expect(result.value).toBeInstanceOf(CsvFormatError);
     expect((result.value as CsvFormatError).message).toBe('Invalid CSV header: missing [date]');
+    expect(result.value).toMatchObject({
+      failureCode: 'INVALID_HEADER',
+      failureDetails: {
+        expected: ['category', 'amount', 'unit', 'date'],
+        missing: ['date'],
+        unexpected: [],
+        duplicated: [],
+      },
+    });
   });
 
   it('rejects an unexpected column', async () => {
@@ -76,6 +85,7 @@ describe('CsvParseCsvParser', () => {
 
     expect(result.isLeft()).toBe(true);
     expect((result.value as CsvFormatError).message).toBe('CSV is empty');
+    expect(result.value).toMatchObject({ failureCode: 'EMPTY_FILE' });
   });
 
   it('yields zero rows for a header-only file', async () => {
@@ -131,6 +141,9 @@ describe('CsvParseCsvParser', () => {
     expect(result.isLeft()).toBe(true);
     expect(result.value).toBeInstanceOf(CsvFormatError);
     expect((result.value as CsvFormatError).message.startsWith('Malformed CSV')).toBe(true);
+    const error = result.value as CsvFormatError;
+    expect(error.failureCode).toBe('MALFORMED_CSV');
+    expect(error.failureDetails).toEqual({ reason: error.message.replace('Malformed CSV: ', '') });
   });
 
   it('rethrows source stream errors instead of returning a Left', async () => {

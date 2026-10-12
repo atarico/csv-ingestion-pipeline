@@ -100,5 +100,6 @@ describe('CreateUploadCommandHandler', () => {
     const [saved] = [...uploadRepository.uploads.values()];
     expect(saved?.status.value).toBe('FAILED');
     expect(saved?.errorMessage).toBe('Could not enqueue file for processing');
+    expect(saved?.errorCode).toBe('ENQUEUE_FAILED');
   });
 });

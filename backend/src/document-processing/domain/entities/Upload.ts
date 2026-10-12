@@ -9,6 +9,25 @@ import type { FileName } from '../value-objects/FileName.js';
 import { UploadStatus } from '../value-objects/UploadStatus.js';
 import { MAX_STORED_ROW_ERRORS, type RowError } from './RowError.js';
 
+export const UPLOAD_FAILURE_CODES = [
+  'INVALID_HEADER',
+  'EMPTY_FILE',
+  'MALFORMED_CSV',
+  'NO_DATA_ROWS',
+  'NO_VALID_ROWS',
+  'ENQUEUE_FAILED',
+  'PROCESSING_ERROR',
+] as const;
+
+export type UploadFailureCode = (typeof UPLOAD_FAILURE_CODES)[number];
+
+/** Why an upload ended FAILED: a stable code, the English message and optional structured details. */
+export interface UploadFailure {
+  code: UploadFailureCode;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
 export interface UploadProps {
   fileName: FileName;
   fileKey: string;
@@ -18,6 +37,8 @@ export interface UploadProps {
   processedRows: number | null;
   failedRows: number | null;
   errorMessage: string | null;
+  errorCode: UploadFailureCode | null;
+  errorDetails: Record<string, unknown> | null;
   rowErrors: RowError[];
   createdAt: Date;
   updatedAt: Date;
@@ -48,6 +69,8 @@ export class Upload extends AggregateRoot<UploadProps> {
       processedRows: null,
       failedRows: null,
       errorMessage: null,
+      errorCode: null,
+      errorDetails: null,
       rowErrors: [],
       createdAt: now,
       updatedAt: now,
@@ -70,7 +93,7 @@ export class Upload extends AggregateRoot<UploadProps> {
     this.props.processedRows = 0;
     this.props.failedRows = 0;
     this.props.rowErrors = [];
-    this.props.errorMessage = null;
+    this.clearFailure();
     this.touch();
     return Either.right(undefined);
   }
@@ -104,17 +127,19 @@ export class Upload extends AggregateRoot<UploadProps> {
     this.props.failedRows = input.failedRows;
     this.props.totalRows = input.processedRows + input.failedRows;
     this.props.rowErrors = input.rowErrors.slice(0, MAX_STORED_ROW_ERRORS);
-    this.props.errorMessage = null;
+    this.clearFailure();
     this.touch();
     return Either.right(undefined);
   }
 
-  fail(errorMessage: string, counts?: FailureCounts): Either<InvalidStateTransitionError, void> {
+  fail(failure: UploadFailure, counts?: FailureCounts): Either<InvalidStateTransitionError, void> {
     const guard = this.guardTransition(UploadStatus.FAILED);
     if (guard) return guard;
 
     this.props.status = UploadStatus.FAILED;
-    this.props.errorMessage = errorMessage;
+    this.props.errorMessage = failure.message;
+    this.props.errorCode = failure.code;
+    this.props.errorDetails = failure.details ?? null;
     if (counts) {
       this.props.processedRows = counts.processedRows;
       this.props.failedRows = counts.failedRows;
@@ -129,6 +154,8 @@ export class Upload extends AggregateRoot<UploadProps> {
   toProps(): UploadProps {
     return {
       ...this.props,
+      errorDetails:
+        this.props.errorDetails === null ? null : structuredClone(this.props.errorDetails),
       rowErrors: this.props.rowErrors.map((error) => ({ ...error })),
       createdAt: new Date(this.props.createdAt),
       updatedAt: new Date(this.props.updatedAt),
@@ -159,6 +186,12 @@ export class Upload extends AggregateRoot<UploadProps> {
   get errorMessage(): string | null {
     return this.props.errorMessage;
   }
+  get errorCode(): UploadFailureCode | null {
+    return this.props.errorCode;
+  }
+  get errorDetails(): Record<string, unknown> | null {
+    return this.props.errorDetails;
+  }
   get rowErrors(): readonly RowError[] {
     return this.props.rowErrors;
   }
@@ -175,6 +208,12 @@ export class Upload extends AggregateRoot<UploadProps> {
   ): Either<InvalidStateTransitionError, never> | undefined {
     if (this.props.status.canTransitionTo(next)) return undefined;
     return Either.left(new InvalidStateTransitionError(this.props.status.value, next.value));
+  }
+
+  private clearFailure(): void {
+    this.props.errorMessage = null;
+    this.props.errorCode = null;
+    this.props.errorDetails = null;
   }
 
   private touch(): void {

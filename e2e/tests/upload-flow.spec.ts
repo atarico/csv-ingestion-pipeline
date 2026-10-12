@@ -6,6 +6,9 @@ test.describe('CSV upload flow', () => {
     const name = uniqueName('sample-data');
     await uploadCsv(page, name, sampleFile('sample-data.csv'));
 
+    await expect(
+      page.getByText('El archivo se subió correctamente. El procesamiento empieza en segundos y esta página se actualiza sola.'),
+    ).toBeVisible();
     await expectStatus(page, 'Completado');
     await expect(page.getByText('Filas procesadas: 60 · Filas con errores: 0')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Datos procesados' })).toBeVisible();
@@ -40,6 +43,10 @@ test.describe('CSV upload flow', () => {
       ['23', 'date'],
     ];
     await expect(errorsTable.getByRole('row')).toHaveCount(expected.length + 1);
+    // Each row carries a plain-Spanish explanation of what is wrong with the offending value.
+    await expect(
+      errorsTable.getByRole('row').filter({ has: page.getByRole('cell', { name: '3', exact: true }) }),
+    ).toContainText('«-12.5» no es un número válido');
     for (const [rowNumber, field] of expected) {
       const match = errorsTable.getByRole('row').filter({
         has: page.getByRole('cell', { name: rowNumber, exact: true }),
@@ -53,8 +60,10 @@ test.describe('CSV upload flow', () => {
     await uploadCsv(page, name, sampleFile('samples/invalid-header.csv'));
 
     await expectStatus(page, 'Fallido');
-    const alert = page.getByRole('alert').filter({ hasText: 'El procesamiento falló' });
-    await expect(alert).toContainText('Invalid CSV header: missing [date]');
+    const alert = page
+      .getByRole('alert')
+      .filter({ hasText: 'La primera fila del archivo no tiene las columnas esperadas' });
+    await expect(alert).toContainText('Faltan: date');
     await expect(page.getByRole('heading', { name: 'Datos procesados' })).toHaveCount(0);
   });
 
@@ -68,6 +77,7 @@ test.describe('CSV upload flow', () => {
     await selectFile(page, name, Buffer.from('not,a,csv\n'), 'text/plain');
 
     await expect(page.getByRole('alert').filter({ hasText: 'El archivo debe' })).toHaveText('El archivo debe tener extensión .csv');
+    await expect(page.getByRole('group', { name: 'Archivo seleccionado' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Subir' })).toBeDisabled();
     expect(uploadRequests).toBe(0);
 

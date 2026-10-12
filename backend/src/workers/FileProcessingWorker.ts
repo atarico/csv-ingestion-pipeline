@@ -185,9 +185,10 @@ export class FileProcessingWorker {
     try {
       const upload = await this.uploadRepository.findById(context.uploadId);
       if (upload === null || upload.status.isTerminal()) return;
-      const failed = upload.fail(
-        `Processing failed after ${context.receiveCount} attempts: ${reason}`,
-      );
+      const failed = upload.fail({
+        code: 'PROCESSING_ERROR',
+        message: `Processing failed after ${context.receiveCount} attempts: ${reason}`,
+      });
       if (failed.isLeft()) return;
       await this.uploadRepository.save(upload);
     } catch (error) {

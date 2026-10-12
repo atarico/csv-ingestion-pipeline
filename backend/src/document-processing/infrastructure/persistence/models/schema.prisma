@@ -26,6 +26,8 @@ model Upload {
   processedRows Int?
   failedRows    Int?
   errorMessage  String?
+  errorCode     String?
+  errorDetails  Json?
   rowErrors     Json?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt

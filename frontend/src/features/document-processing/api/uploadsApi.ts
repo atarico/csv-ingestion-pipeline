@@ -18,6 +18,9 @@ export const uploadKeys = {
 
 const LIST_REFRESH_MS = 5000;
 
+/** sessionStorage key read by the detail page to show the "uploaded" banner once. */
+export const JUST_UPLOADED_KEY = 'carbonbox:just-uploaded';
+
 export function useUploads(page: number) {
   return useQuery({
     queryKey: uploadKeys.list(page),
@@ -67,6 +70,11 @@ export function useCreateUpload() {
         queryClient.invalidateQueries({ queryKey: uploadKeys.lists() }),
         queryClient.invalidateQueries({ queryKey: uploadKeys.stats() }),
       ]);
+      try {
+        sessionStorage.setItem(JUST_UPLOADED_KEY, created.id);
+      } catch {
+        // Storage can be blocked; the banner is a nicety, the redirect is not.
+      }
       router.push(`/uploads/${created.id}`);
     },
   });

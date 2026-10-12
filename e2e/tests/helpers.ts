@@ -21,13 +21,14 @@ export function uniqueName(base: string, extension = 'csv'): string {
 export async function selectFile(page: Page, name: string, buffer: Buffer, mimeType = 'text/csv') {
   await page.goto('/uploads/new');
   await page.getByLabel(/Arrastra y suelta un archivo CSV/).setInputFiles({ name, mimeType, buffer });
-  await expect(page.getByText(`Archivo seleccionado: ${name}`)).toBeVisible();
 }
 
 /** Uploads a CSV and waits for the redirect to its detail page. */
 export async function uploadCsv(page: Page, name: string, buffer: Buffer) {
   await selectFile(page, name, buffer);
+  await expect(page.getByRole('group', { name: 'Archivo seleccionado' })).toContainText(name);
   await page.getByRole('button', { name: 'Subir' }).click();
+  await page.getByRole('button', { name: 'Sí, procesar' }).click();
   await expect(page).toHaveURL(/\/uploads\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { name: 'Detalle del upload' })).toBeVisible();
   await expect(page.getByRole('definition').filter({ hasText: name })).toBeVisible();

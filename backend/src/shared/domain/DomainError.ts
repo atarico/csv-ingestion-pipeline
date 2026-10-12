@@ -1,6 +1,21 @@
+/** Machine-readable reason of a field error; messages stay the human-readable English text. */
+export const FIELD_ERROR_CODES = [
+  'REQUIRED',
+  'INVALID_NUMBER',
+  'NOT_POSITIVE',
+  'TOO_LONG',
+  'CONTROL_CHARACTERS',
+  'INVALID_DATE_FORMAT',
+  'INVALID_DATE',
+] as const;
+
+export type FieldErrorCode = (typeof FIELD_ERROR_CODES)[number];
+
 export interface FieldError {
   field: string;
   message: string;
+  /** Left undefined by transport-level (zod) validation. */
+  code?: FieldErrorCode;
 }
 
 export abstract class DomainError extends Error {
@@ -74,10 +89,16 @@ export class MessagingError extends DomainError {
   }
 }
 
+export type CsvFailureCode = 'INVALID_HEADER' | 'EMPTY_FILE' | 'MALFORMED_CSV';
+
 export class CsvFormatError extends DomainError {
   readonly code = 'CSV_FORMAT_ERROR';
   readonly httpStatus = 422;
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly failureCode: CsvFailureCode,
+    readonly failureDetails?: Record<string, unknown>,
+  ) {
     super(message);
   }
 }

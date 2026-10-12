@@ -12,23 +12,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-/** Extracts the first human-readable message from the `details` field of an API error. */
-function firstDetailMessage(details: unknown): string | null {
-  const entries = Array.isArray(details) ? details : isRecord(details) ? Object.values(details) : [];
-  for (const entry of entries) {
-    if (isRecord(entry) && typeof entry.message === 'string') return entry.message;
-    if (typeof entry === 'string') return entry;
-  }
-  return null;
-}
+const SERVICE_UNAVAILABLE_MESSAGE = 'El servicio no está disponible. Vuelve a intentarlo en unos minutos.';
+
+// The API speaks English; the UI explains in Spanish from the stable error code.
+const MESSAGES_BY_CODE: Record<string, string> = {
+  UNSUPPORTED_FILE: 'Solo se permiten archivos .csv',
+  FILE_TOO_LARGE: 'El archivo supera el tamaño máximo de 5 MB',
+  NOT_FOUND: 'Upload no encontrado',
+  VALIDATION_ERROR: 'Solicitud inválida',
+  STORAGE_ERROR: SERVICE_UNAVAILABLE_MESSAGE,
+  MESSAGING_ERROR: SERVICE_UNAVAILABLE_MESSAGE,
+};
 
 /** Maps any thrown value to a Spanish, user-facing message. */
 export function getApiErrorMessage(error: unknown): string {
   if (isAxiosError(error)) {
     const body: unknown = error.response?.data;
-    if (isRecord(body) && isRecord(body.error) && typeof body.error.message === 'string') {
-      const detail = firstDetailMessage(body.error.details);
-      return detail ? `${body.error.message}: ${detail}` : body.error.message;
+    if (isRecord(body) && isRecord(body.error) && typeof body.error.code === 'string') {
+      return MESSAGES_BY_CODE[body.error.code] ?? UNEXPECTED_ERROR_MESSAGE;
     }
     if (!error.response) return NETWORK_ERROR_MESSAGE;
   }

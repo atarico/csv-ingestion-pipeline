@@ -125,6 +125,63 @@ describe('ProcessFileCommandHandler', () => {
     const stored = await persisted(upload);
     expect(stored.status.value).toBe('COMPLETED');
     expect(stored.rowErrors.map((e) => [e.row, e.field])).toEqual([[2, 'category']]);
+    expect(stored.rowErrors[0]).toMatchObject({
+      code: 'CONTROL_CHARACTERS',
+      value: 'ener\uFFFDgy',
+    });
+  });
+
+  it('records the code and the offending value of each invalid field', async () => {
+    const upload = await seedUpload(csv(VALID_ROW, 'energy,abc,kWh,2026-13-45'));
+
+    await run(upload);
+
+    const stored = await persisted(upload);
+    expect(stored.rowErrors.map((e) => [e.field, e.code, e.value])).toEqual([
+      ['amount', 'INVALID_NUMBER', 'abc'],
+      ['date', 'INVALID_DATE', '2026-13-45'],
+    ]);
+  });
+
+  it('omits the value when the field is empty', async () => {
+    const upload = await seedUpload(csv(VALID_ROW, 'energy,10,,2026-01-15'));
+
+    await run(upload);
+
+    const [error] = (await persisted(upload)).rowErrors;
+    expect(error).toMatchObject({ field: 'unit', code: 'REQUIRED' });
+    expect(error).not.toHaveProperty('value');
+  });
+
+  it('truncates a long value to 50 characters plus an ellipsis', async () => {
+    const long = 'x'.repeat(120);
+    const upload = await seedUpload(csv(VALID_ROW, `${long},10,kWh,2026-01-15`));
+
+    await run(upload);
+
+    const [error] = (await persisted(upload)).rowErrors;
+    expect(error).toMatchObject({ field: 'category', code: 'TOO_LONG' });
+    expect(error?.value).toBe(`${'x'.repeat(50)}\u2026`);
+  });
+
+  it('never splits a surrogate pair when truncating', async () => {
+    const cell = `${'a'.repeat(49)}\u{1F600}tail`;
+    const upload = await seedUpload(csv(VALID_ROW, `energy,${cell},kWh,2026-01-15`));
+
+    await run(upload);
+
+    const [error] = (await persisted(upload)).rowErrors;
+    expect(error?.value).toBe(`${'a'.repeat(49)}\u{1F600}\u2026`);
+  });
+
+  it('keeps a value of exactly 50 characters untouched', async () => {
+    const edge = 'y'.repeat(50);
+    const upload = await seedUpload(csv(VALID_ROW, `energy,${edge},kWh,2026-01-15`));
+
+    await run(upload);
+
+    const [error] = (await persisted(upload)).rowErrors;
+    expect(error?.value).toBe(edge);
   });
 
   it('fails on invalid header', async () => {
@@ -136,6 +193,11 @@ describe('ProcessFileCommandHandler', () => {
     const stored = await persisted(upload);
     expect(stored.status.value).toBe('FAILED');
     expect(stored.errorMessage).toContain('Invalid CSV header');
+    expect(stored.errorCode).toBe('INVALID_HEADER');
+    expect(stored.errorDetails).toMatchObject({
+      expected: ['category', 'amount', 'unit', 'date'],
+      missing: ['date'],
+    });
     expect(stored.totalRows).toBeNull();
     expect(stored.processedRows).toBeNull();
     expect(stored.failedRows).toBeNull();
@@ -149,6 +211,7 @@ describe('ProcessFileCommandHandler', () => {
     expect(result.value).toMatchObject({ status: 'FAILED' });
     const stored = await persisted(upload);
     expect(stored.errorMessage).toBe('CSV is empty');
+    expect(stored.errorCode).toBe('EMPTY_FILE');
   });
 
   it('fails on header-only file', async () => {
@@ -159,6 +222,7 @@ describe('ProcessFileCommandHandler', () => {
     expect(result.value).toMatchObject({ status: 'FAILED', processedRows: 0, failedRows: 0 });
     const stored = await persisted(upload);
     expect(stored.errorMessage).toBe('CSV has no data rows');
+    expect(stored.errorCode).toBe('NO_DATA_ROWS');
     expect(stored.processedRows).toBe(0);
     expect(stored.failedRows).toBe(0);
   });
@@ -176,6 +240,7 @@ describe('ProcessFileCommandHandler', () => {
     });
     const stored = await persisted(upload);
     expect(stored.errorMessage).toBe('No valid rows found');
+    expect(stored.errorCode).toBe('NO_VALID_ROWS');
     expect(stored.rowErrors).toHaveLength(4);
     expect(activityDataRepository.rows).toHaveLength(0);
   });
@@ -229,7 +294,11 @@ describe('ProcessFileCommandHandler', () => {
       parse: async (_stream, onRecord) => {
         await onRecord({ category: 'energy', amount: '1', unit: 'kWh', date: '2026-01-15' }, 1);
         await onRecord({ category: 'energy', amount: '2', unit: 'kWh', date: '2026-01-16' }, 2);
-        return Either.left(new CsvFormatError('Malformed quoted field at line 4'));
+        return Either.left(
+          new CsvFormatError('Malformed quoted field at line 4', 'MALFORMED_CSV', {
+            reason: 'Malformed quoted field at line 4',
+          }),
+        );
       },
     };
     handler = new ProcessFileCommandHandler(
@@ -252,6 +321,8 @@ describe('ProcessFileCommandHandler', () => {
     const stored = await persisted(upload);
     expect(stored.status.value).toBe('FAILED');
     expect(stored.errorMessage).toBe('Malformed quoted field at line 4');
+    expect(stored.errorCode).toBe('MALFORMED_CSV');
+    expect(stored.errorDetails).toEqual({ reason: 'Malformed quoted field at line 4' });
     expect(stored.processedRows).toBe(0);
     expect(stored.failedRows).toBe(0);
     expect(activityDataRepository.rows).toHaveLength(0);

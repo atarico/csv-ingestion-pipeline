@@ -13,3 +13,17 @@ const numberFormat = new Intl.NumberFormat('es', { maximumFractionDigits: 4 });
 export function formatNumber(value: number): string {
   return numberFormat.format(value);
 }
+
+const sizeFormat = new Intl.NumberFormat('es', { maximumFractionDigits: 1 });
+const SIZE_UNITS = ['B', 'KB', 'MB', 'GB'];
+
+/** Human file size with the 1024 base and one decimal at most ("12,3 KB"). */
+export function formatBytes(bytes: number): string {
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < SIZE_UNITS.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${sizeFormat.format(value)} ${SIZE_UNITS[unit]}`;
+}

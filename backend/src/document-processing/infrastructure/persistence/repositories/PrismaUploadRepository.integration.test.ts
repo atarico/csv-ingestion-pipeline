@@ -26,6 +26,8 @@ function uploadWith(id: string, createdAt: Date): Upload {
     processedRows: null,
     failedRows: null,
     errorMessage: null,
+    errorCode: null,
+    errorDetails: null,
     rowErrors: [],
     createdAt,
     updatedAt: createdAt,

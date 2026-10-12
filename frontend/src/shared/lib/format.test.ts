@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDateTime, formatNumber } from './format';
+import { formatBytes, formatDateTime, formatNumber } from './format';
 
 describe('format', () => {
   it('formatDateTime renders dd/MM/yyyy HH:mm', () => {
@@ -12,5 +12,12 @@ describe('format', () => {
 
   it('formatNumber keeps up to four decimals', () => {
     expect(formatNumber(12345.67891)).toBe('12.345,6789');
+  });
+
+  it('formatBytes uses 1024 base, es locale and one decimal', () => {
+    expect(formatBytes(0)).toBe('0 B');
+    expect(formatBytes(999)).toBe('999 B');
+    expect(formatBytes(12595)).toBe('12,3 KB');
+    expect(formatBytes(5 * 1024 * 1024)).toBe('5 MB');
   });
 });

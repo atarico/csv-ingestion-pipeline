@@ -264,6 +264,39 @@ carbonbox-challenge/
 └── docker-compose.yml
 ```
 
+## Interfaz
+
+La interfaz usa los tokens de marca observados en carbonbox.app: azul primario `#1620a4`,
+verde de acento `#2f6b4a`, menta `#7ed3a8`, superficie oscura `#0d1230`, tipografía
+Poppins, botones en forma de píldora y tarjetas con borde fino y sombra suave. Los tokens
+están como variables CSS `--cb-*` (claro y oscuro) en `frontend/src/styles/globals.css` y se
+exponen a Tailwind con `@theme inline`. El logo y los colores de CarbonBox son marcas de
+CarbonBox y se usan solo dentro de esta entrega.
+
+**Desviación de contraste.** El rojo de peligro del sitio (`#c0453f` sobre `#f7e4e3`) tiene
+una relación de contraste de 4,12:1, por debajo del mínimo de 4,5:1 para texto. Aquí el texto
+de error usa `#a83a35` (5,17:1 sobre el mismo fondo). Una prueba de contraste
+(`tokens.test.ts`) comprueba los pares de colores de ambos temas.
+
+**Tema claro y oscuro.** El botón del encabezado alterna el tema. La elección se guarda en
+`localStorage` con la clave `carbonbox-theme`; si no hay nada guardado, se usa la preferencia
+del sistema (`prefers-color-scheme`). Un script en línea en el `<head>` aplica el tema antes
+del primer pintado, así que la página no parpadea con el tema equivocado. Si
+`localStorage` no está disponible, el tema sigue la preferencia del sistema.
+
+**Subida con confirmación.** Al elegir un archivo aparece una tarjeta con su nombre y tamaño
+(y la opción "Cambiar archivo"). `Subir` no sube nada todavía: abre el diálogo
+"¿Procesar el archivo?" con los botones `Sí, procesar` y `Cancelar`. Un archivo vacío (0
+bytes) se rechaza en el cliente antes de llegar a ese paso.
+
+**Aviso de archivo subido.** Tras confirmar, el detalle del upload muestra un aviso: "El
+archivo se subió correctamente. El procesamiento empieza en segundos y esta página se
+actualiza sola." Se muestra una sola vez por subida (una marca en `sessionStorage`).
+
+**Errores explicados.** Cuando un upload falla o una fila se rechaza, la interfaz explica en
+español qué ocurrió y cómo corregirlo a partir de los códigos de la API (ver "Códigos de
+error" más abajo).
+
 ## Decisiones técnicas
 
 ### Decisiones ante ambigüedades del enunciado
@@ -326,6 +359,22 @@ carbonbox-challenge/
 - **Parada ordenada.** El long polling y la espera del backoff del worker se pueden
   cancelar, y Compose define `stop_grace_period`; así `docker compose stop` termina el
   worker en menos de un segundo en lugar de esperar la recepción en curso.
+- **Poppins autoalojada.** Se usa `@fontsource/poppins` (versión exacta 5.3.0) en lugar de
+  `next/font/google`: este último descarga la fuente de Google en el build, y el build de la
+  imagen Docker no debe depender de la red.
+- **Tema propio en lugar de `next-themes`.** Son cuatro archivos pequeños (`frontend/src/shared/theme/`)
+  y evitan una dependencia. El estado vive en el atributo `data-theme` de `<html>`, que el
+  script en línea fija antes del primer pintado; `ThemeProvider` lo lee con
+  `useSyncExternalStore` (el servidor devuelve `light` y el cliente lee el DOM, sin
+  desajuste de hidratación ni `setState` en un efecto) y un `MutationObserver` mantiene el
+  estado al día si el atributo cambia.
+- **La API sigue en inglés, con códigos legibles por máquina; la interfaz explica en
+  español.** Los mensajes de la API no cambian. Cada fallo añade un código estable
+  (`errorCode`, `rowErrors[].code`) y la interfaz decide el texto en español y la
+  corrección sugerida. Los códigos viven en el dominio (`FieldErrorCode` en
+  `shared/domain/DomainError.ts`, `UploadFailureCode` en `Upload.ts`) porque son parte del
+  lenguaje del negocio: los value objects los emiten al validar, así que ningún adaptador
+  tiene que interpretar mensajes en texto.
 - **Sin retrasos artificiales.** El código de producción no tiene `sleep` para hacer
   visible `PROCESSING`; para observarlo se usa el archivo grande de `samples/`.
 
@@ -365,9 +414,17 @@ Estado real de lo que no está completo o no se pudo comprobar:
 - **Número de fila en los errores.** El campo `row` de cada error es el índice del registro
   de datos (sin contar la cabecera y saltando las líneas en blanco), no el número de línea
   físico del archivo.
-- **Mensajes en inglés.** Los mensajes de la API y de los errores (por ejemplo
+- **Mensajes de la API en inglés.** Los campos `message` y `errorMessage` (por ejemplo
   `Invalid CSV header: missing [date]`) están en inglés a propósito, como parte del
-  contrato de la API; la interfaz los muestra tal cual, dentro de una UI en español.
+  contrato de la API. La interfaz no los muestra tal cual: usa los códigos para explicar el
+  problema en español y solo recurre al texto en inglés cuando el código es desconocido o
+  falta (por ejemplo, en registros antiguos).
+- **`value` truncado a 50 caracteres.** El valor de la celda en `rowErrors[].value` se
+  recorta y termina en `…` si pasa de 50; los caracteres de control se guardan como `�`
+  (PostgreSQL `jsonb` rechaza `\u0000`). No es el contenido completo de la celda.
+- **El aviso "archivo subido" puede ser impreciso.** Dice que el procesamiento empieza en
+  segundos aunque un archivo muy pequeño ya haya terminado, o fallado, cuando carga la
+  página; el estado real se muestra justo debajo.
 - **Apagado.** Con `docker compose stop` el worker termina en menos de un segundo (medido:
   0,3 s, código de salida 0), porque la espera de la recepción en curso se cancela; los
   servicios tienen `stop_grace_period` (30 s el worker, 15 s la API). La API no tiene un
@@ -385,8 +442,6 @@ Estado real de lo que no está completo o no se pudo comprobar:
     el cliente) arrastra `mysql2` y `deepmerge-ts`; `mysql2` no se usa porque la aplicación
     solo habla con PostgreSQL. La corrección que propone npm es un cambio mayor
     (`prisma@6`) y no se aplicó.
-- **Dockerfile del frontend sin `public/`.** El scaffold no tiene carpeta `public`, por lo
-  que el Dockerfile no copia ese directorio.
 - **No incluido en esta entrega** (sin impacto de usuario): eliminar el índice
   `@@index([uploadId])`, redundante con el `@@unique`; normalizar `Amount`; limitar el rango
   de años de `ActivityDate`; un endpoint `/ready`; políticas `restart` en Compose y fijar
@@ -415,15 +470,19 @@ Estado real de lo que no está completo o no se pudo comprobar:
 ### Paso a paso con el CSV de ejemplo
 
 1. Levanta todo (opción A o B). Con una base de datos nueva, el dashboard muestra ceros.
-2. Abre http://localhost:3000/uploads/new y sube `sample-data.csv` (arrastrar y soltar o
-   selector; solo se aceptan archivos `.csv`).
-3. Se redirige al detalle del upload. Con 60 filas, `Pendiente` y `Procesando` duran
+2. Abre http://localhost:3000/uploads/new y elige `sample-data.csv` (arrastrar y soltar o
+   selector; solo se aceptan archivos `.csv`). Aparece la tarjeta con el nombre y el
+   tamaño; pulsa `Subir` y confirma en el diálogo "¿Procesar el archivo?" con `Sí, procesar`.
+3. Se redirige al detalle del upload, con el aviso de archivo subido. Con 60 filas, `Pendiente` y `Procesando` duran
    milisegundos y normalmente no se ven: el estado pasa a `Completado` en pocos segundos y
    aparecen las 60 filas en una sola página.
 4. En el log del worker aparece `Upload processed` con `processedRows: 60`.
 5. Sube `samples/sample-with-errors.csv`: `Completado`, `Filas con errores: 6` y la tabla
-   de errores con las filas 3, 7, 11, 15, 19 y 23.
-6. Sube `samples/invalid-header.csv`: `Fallido` con el mensaje `Invalid CSV header: missing [date]`.
+   de errores con las filas 3, 7, 11, 15, 19 y 23, cada una con el valor ofensivo y una
+   explicación (por ejemplo, fila 3: «-12.5» no es un número válido).
+6. Sube `samples/invalid-header.csv`: `Fallido` con el título "La primera fila del archivo
+   no tiene las columnas esperadas", la línea `Faltan: date` y un enlace para descargar un
+   CSV de ejemplo.
 
 ### Qué observar durante el procesamiento
 
@@ -492,15 +551,52 @@ curl -s http://localhost:4000/health
 
 Los errores tienen la forma `{"error":{"code","message","details?"},"requestId"}`.
 
+### Códigos de error
+
+Los cambios de esta ronda son aditivos: no se quitó ni cambió ningún campo existente, así
+que los clientes anteriores siguen funcionando. `GET /api/v1/uploads/:id` añade:
+
+| Campo | Contenido |
+|-------|-----------|
+| `errorCode` | Código de `UploadFailureCode` si el upload está `FAILED`; `null` en otro caso |
+| `errorDetails` | Datos estructurados del fallo (objeto) o `null`; con `INVALID_HEADER`: `expected`, `missing`, `unexpected`, `duplicated`; con `MALFORMED_CSV`: `reason` |
+| `rowErrors[].code` | Código de `FieldErrorCode`, o `INVALID` |
+| `rowErrors[].value` | Celda ofensiva, recortada, hasta 50 caracteres más `…`; se omite si la celda está vacía |
+
+`UploadFailureCode` (`errorCode`):
+
+| Código | Cuándo ocurre |
+|--------|---------------|
+| `INVALID_HEADER` | La cabecera no tiene exactamente `category,amount,unit,date` |
+| `EMPTY_FILE` | El archivo está vacío |
+| `MALFORMED_CSV` | El archivo no se puede leer como CSV |
+| `NO_DATA_ROWS` | Solo hay fila de cabecera |
+| `NO_VALID_ROWS` | Ninguna fila es válida |
+| `ENQUEUE_FAILED` | No se pudo encolar el archivo para procesarlo |
+| `PROCESSING_ERROR` | Fallo al procesar, por ejemplo tras agotar los reintentos del worker |
+
+`FieldErrorCode` (`rowErrors[].code`):
+
+| Código | Cuándo ocurre |
+|--------|---------------|
+| `REQUIRED` | La celda está vacía o falta la columna |
+| `INVALID_NUMBER` | `amount` no es un número positivo con hasta 4 decimales (incluye los negativos) |
+| `NOT_POSITIVE` | `amount` es 0 |
+| `TOO_LONG` | El texto supera el máximo (`category` 100, `unit` 20) |
+| `CONTROL_CHARACTERS` | La celda contiene caracteres de control |
+| `INVALID_DATE_FORMAT` | `date` no tiene el formato `AAAA-MM-DD` |
+| `INVALID_DATE` | `date` no es una fecha real del calendario |
+| `INVALID` | Valor de reserva: los registros guardados antes de esta ronda no tienen código y se cargan con `INVALID` |
+
 ## Testing
 
 | Suite | Comando | Resultado verificado |
 |-------|---------|----------------------|
-| Backend, todo | `cd backend && npm test` | 220 pruebas en 27 archivos |
-| Backend, unitarias | `npm run test:unit` | 181 pruebas en 23 archivos; sin infraestructura |
-| Backend, integración | `npm run test:integration` | 39 pruebas en 4 archivos; necesitan PostgreSQL (`docker compose up -d`); usan una base `document_processing_test` y no tocan S3 ni SQS |
-| Frontend | `cd frontend && npm test` | 44 pruebas en 9 archivos |
-| Cobertura | `npm run test:coverage` | líneas: global 85,84 % |
+| Backend, todo | `cd backend && npm test` | 247 pruebas (202 unitarias y 45 de integración) |
+| Backend, unitarias | `npm run test:unit` | 202 pruebas; sin infraestructura |
+| Backend, integración | `npm run test:integration` | 45 pruebas; necesitan PostgreSQL (`docker compose up -d`); usan una base `document_processing_test` y no tocan S3 ni SQS |
+| Frontend | `cd frontend && npm test` | 146 pruebas |
+| Cobertura | `npm run test:coverage` | líneas: global 86,31 % |
 
 Las pruebas se escribieron antes que el código en cada capa. Los adaptadores de S3 y SQS no
 tienen pruebas unitarias (ver "Limitaciones conocidas").
@@ -522,12 +618,15 @@ npm test                          # E2E_BASE_URL cambia la URL (por defecto http
 Cada prueba sube el archivo con un nombre único, así que no depende de las filas que ya
 existan en la base. Cubren: el CSV válido (`sample-data.csv`, 60 filas) hasta
 "Completado" y su aparición en la lista; `samples/sample-with-errors.csv` (19 filas
-válidas, 6 con error, errores por fila visibles); `samples/invalid-header.csv`
-("Fallido" con `Invalid CSV header: missing [date]`); y el rechazo en el cliente de un
-archivo que no es `.csv`. El informe HTML se genera siempre en `e2e/playwright-report/`;
+válidas, 6 con error, errores por fila visibles y la explicación de la fila 3,
+«-12.5» no es un número válido); `samples/invalid-header.csv` ("Fallido" con la
+explicación de la cabecera y `Faltan: date`); y el rechazo en el cliente de un archivo que
+no es `.csv`. Una quinta prueba (`theme.spec.ts`) comprueba que el tema sigue al sistema,
+se alterna, persiste al recargar y deja visibles las insignias de estado. Las pruebas de
+subida confirman en el diálogo antes de procesar. El informe HTML se genera siempre en `e2e/playwright-report/`;
 CI solo lo sube como artefacto cuando las pruebas fallan.
 
-Estas cuatro pruebas son la evidencia automática del comportamiento de la interfaz en
+Estas cinco pruebas (cuatro de subida y una de tema) son la evidencia automática del comportamiento de la interfaz en
 Chromium. Antes de la entrega, el candidato la verifica además a mano en un navegador de
 escritorio.
 

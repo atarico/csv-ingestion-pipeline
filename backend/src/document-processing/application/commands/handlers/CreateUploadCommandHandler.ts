@@ -52,7 +52,7 @@ export class CreateUploadCommandHandler implements ICommandHandler<
     );
     if (published.isLeft()) {
       // Cannot be a Left: the upload was created PENDING in this call and PENDING -> FAILED is allowed.
-      upload.fail('Could not enqueue file for processing');
+      upload.fail({ code: 'ENQUEUE_FAILED', message: 'Could not enqueue file for processing' });
       await this.uploadRepository.save(upload);
       return Either.left(published.value);
     }
