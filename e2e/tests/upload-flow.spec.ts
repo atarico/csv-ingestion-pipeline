@@ -43,6 +43,10 @@ test.describe('CSV upload flow', () => {
       ['23', 'date'],
     ];
     await expect(errorsTable.getByRole('row')).toHaveCount(expected.length + 1);
+    // Each row carries a plain-Spanish explanation of what is wrong with the offending value.
+    await expect(
+      errorsTable.getByRole('row').filter({ has: page.getByRole('cell', { name: '3', exact: true }) }),
+    ).toContainText('«-12.5» no es un número válido');
     for (const [rowNumber, field] of expected) {
       const match = errorsTable.getByRole('row').filter({
         has: page.getByRole('cell', { name: rowNumber, exact: true }),
@@ -56,8 +60,10 @@ test.describe('CSV upload flow', () => {
     await uploadCsv(page, name, sampleFile('samples/invalid-header.csv'));
 
     await expectStatus(page, 'Fallido');
-    const alert = page.getByRole('alert').filter({ hasText: 'El procesamiento falló' });
-    await expect(alert).toContainText('Invalid CSV header: missing [date]');
+    const alert = page
+      .getByRole('alert')
+      .filter({ hasText: 'La primera fila del archivo no tiene las columnas esperadas' });
+    await expect(alert).toContainText('Faltan: date');
     await expect(page.getByRole('heading', { name: 'Datos procesados' })).toHaveCount(0);
   });
 

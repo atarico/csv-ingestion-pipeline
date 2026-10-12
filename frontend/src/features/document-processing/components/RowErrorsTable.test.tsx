@@ -1,0 +1,58 @@
+import { render, screen, within } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import type { RowErrorDto } from '../types/upload.types';
+import { RowErrorsTable } from './RowErrorsTable';
+
+function bodyRow(index: number): HTMLElement {
+  const row = screen.getAllByRole('row')[index];
+  if (!row) throw new Error(`missing row ${index}`);
+  return row;
+}
+
+const errors: RowErrorDto[] = [
+  { row: 3, field: 'amount', code: 'INVALID_NUMBER', message: 'Amount must be a number', value: '-12.5' },
+  { row: 7, field: 'unit', code: 'REQUIRED', message: 'Unit is required' },
+  { row: 9, code: 'INVALID', message: 'Something odd' },
+];
+
+describe('RowErrorsTable', () => {
+  it('renders the four guidance columns', () => {
+    render(<RowErrorsTable errors={errors} failedRows={3} />);
+
+    const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
+    expect(headers).toEqual(['Fila', 'Columna', 'Valor', 'Qué pasa y cómo corregirlo']);
+  });
+
+  it('shows the row, the verbatim field, the value and the Spanish explanation', () => {
+    render(<RowErrorsTable errors={errors} failedRows={3} />);
+
+    const row = bodyRow(1);
+    expect(within(row).getByRole('cell', { name: '3' })).toBeInTheDocument();
+    expect(within(row).getByRole('cell', { name: 'amount' })).toBeInTheDocument();
+    const value = within(row).getByRole('cell', { name: '-12.5' });
+    expect(value).toHaveClass('font-mono');
+    expect(row).toHaveTextContent('«-12.5» no es un número válido');
+  });
+
+  it('uses a dash when the value or the field is missing', () => {
+    render(<RowErrorsTable errors={errors} failedRows={3} />);
+
+    const withoutValue = bodyRow(2);
+    expect(within(withoutValue).getAllByRole('cell', { name: '—' })).toHaveLength(1);
+    const withoutField = bodyRow(3);
+    expect(within(withoutField).getAllByRole('cell', { name: '—' })).toHaveLength(2);
+    expect(withoutField).toHaveTextContent('Something odd');
+  });
+
+  it('always explains how rows are numbered', () => {
+    render(<RowErrorsTable errors={errors} failedRows={3} />);
+    expect(screen.getByText('La fila 1 es la primera después de la cabecera.')).toBeInTheDocument();
+    expect(screen.queryByText(/Se muestran los primeros/)).not.toBeInTheDocument();
+  });
+
+  it('notes when only the first errors are shown', () => {
+    render(<RowErrorsTable errors={errors} failedRows={250} />);
+    expect(screen.getByText('Se muestran los primeros 3 errores de 250.')).toBeInTheDocument();
+    expect(screen.getByText('La fila 1 es la primera después de la cabecera.')).toBeInTheDocument();
+  });
+});

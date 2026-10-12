@@ -7,9 +7,11 @@ import { CheckCircleIcon, XIcon } from '@/shared/components/icons';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { getApiErrorMessage } from '@/shared/lib/api-client';
 import { formatDateTime } from '@/shared/lib/format';
+import { describeUploadFailure } from '../lib/describeErrors';
 import { JUST_UPLOADED_KEY, useUpload, useUploadResults } from '../api/uploadsApi';
 import { ProcessingStatus } from './ProcessingStatus';
 import { ResultsTable } from './ResultsTable';
+import type { UploadDto } from '../types/upload.types';
 import { RowErrorsTable } from './RowErrorsTable';
 
 export function UploadDetail({ id }: { id: string }) {
@@ -119,10 +121,7 @@ export function UploadDetail({ id }: { id: string }) {
 
           {upload.status === 'FAILED' ? (
             <>
-              <ErrorAlert
-                title="El procesamiento falló"
-                message={upload.errorMessage ?? 'Ocurrió un error inesperado'}
-              />
+              <FailureAlert upload={upload} />
               {upload.rowErrors.length > 0 ? (
                 <div className="space-y-3">
                   <h2 className="text-xl font-bold tracking-tight text-primary">Filas con errores</h2>
@@ -134,5 +133,29 @@ export function UploadDetail({ id }: { id: string }) {
         </>
       ) : null}
     </section>
+  );
+}
+
+function FailureAlert({ upload }: { upload: UploadDto }) {
+  const { title, where, lines, fix, sampleLink } = describeUploadFailure(upload);
+  return (
+    <ErrorAlert title={title}>
+      <div className="mt-1 space-y-2 text-sm">
+        {where ? <p className="font-medium">Dónde: {where}</p> : null}
+        {lines.length > 0 ? (
+          <ul className="list-inside list-disc">
+            {lines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        ) : null}
+        {fix ? <p>{fix}</p> : null}
+        {sampleLink ? (
+          <a href="/ejemplo.csv" download className="inline-block font-semibold underline underline-offset-2">
+            Descargar un CSV de ejemplo
+          </a>
+        ) : null}
+      </div>
+    </ErrorAlert>
   );
 }

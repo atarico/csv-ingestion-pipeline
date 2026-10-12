@@ -22,6 +22,8 @@ const upload: UploadDto = {
   processedRows: null,
   failedRows: null,
   errorMessage: null,
+  errorCode: null,
+  errorDetails: null,
   rowErrors: [],
   createdAt: '2024-01-15T10:30:00.000Z',
   updatedAt: '2024-01-15T10:30:00.000Z',
@@ -70,5 +72,59 @@ describe('UploadDetail uploaded banner', () => {
     await user.click(screen.getByRole('button', { name: 'Cerrar aviso' }));
 
     expect(screen.queryByText(BANNER)).not.toBeInTheDocument();
+  });
+});
+
+describe('UploadDetail failure guidance', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it('explains an invalid header with the missing columns and a sample link', async () => {
+    vi.mocked(uploadsClient.getById).mockResolvedValue({
+      ...upload,
+      status: 'FAILED',
+      errorMessage: 'Invalid CSV header: missing [date]',
+      errorCode: 'INVALID_HEADER',
+      errorDetails: { expected: ['category', 'amount', 'unit', 'date'], missing: ['date'], unexpected: [], duplicated: [] },
+    });
+    renderDetail();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('La primera fila del archivo no tiene las columnas esperadas');
+    expect(alert).toHaveTextContent('Faltan: date');
+    expect(alert).toHaveTextContent('Cabecera (primera línea del archivo)');
+    expect(alert).not.toHaveTextContent('Invalid CSV header');
+    expect(screen.getByRole('link', { name: 'Descargar un CSV de ejemplo' })).toHaveAttribute('href', '/ejemplo.csv');
+    expect(screen.queryByRole('heading', { name: 'Filas con errores' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the legacy title and raw message for records without a code', async () => {
+    vi.mocked(uploadsClient.getById).mockResolvedValue({
+      ...upload,
+      status: 'FAILED',
+      errorMessage: 'Something broke',
+    });
+    renderDetail();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('El procesamiento falló');
+    expect(alert).toHaveTextContent('Something broke');
+  });
+
+  it('shows the row errors table below NO_VALID_ROWS', async () => {
+    vi.mocked(uploadsClient.getById).mockResolvedValue({
+      ...upload,
+      status: 'FAILED',
+      failedRows: 1,
+      errorMessage: 'No valid rows found',
+      errorCode: 'NO_VALID_ROWS',
+      rowErrors: [{ row: 1, field: 'amount', code: 'INVALID_NUMBER', message: 'bad', value: 'abc' }],
+    });
+    renderDetail();
+
+    expect(await screen.findByText('Ninguna fila pudo procesarse')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Filas con errores' })).toBeInTheDocument();
+    expect(screen.getByText(/«abc» no es un número válido/)).toBeInTheDocument();
   });
 });
