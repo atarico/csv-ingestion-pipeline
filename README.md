@@ -417,8 +417,9 @@ Estado real de lo que no está completo o no se pudo comprobar:
 - **Mensajes de la API en inglés.** Los campos `message` y `errorMessage` (por ejemplo
   `Invalid CSV header: missing [date]`) están en inglés a propósito, como parte del
   contrato de la API. La interfaz no los muestra tal cual: usa los códigos para explicar el
-  problema en español y solo recurre al texto en inglés cuando el código es desconocido o
-  falta (por ejemplo, en registros antiguos).
+  problema en español, y conserva el texto en inglés como detalle cuando el código no
+  alcanza para explicarlo (`MALFORMED_CSV`, `ENQUEUE_FAILED`, `PROCESSING_ERROR`) o falta
+  (registros antiguos).
 - **`value` truncado a 50 caracteres.** El valor de la celda en `rowErrors[].value` se
   recorta y termina en `…` si pasa de 50; los caracteres de control se guardan como `�`
   (PostgreSQL `jsonb` rechaza `\u0000`). No es el contenido completo de la celda.
