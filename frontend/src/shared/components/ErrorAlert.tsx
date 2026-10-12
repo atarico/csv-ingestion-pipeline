@@ -1,3 +1,6 @@
+import { Button } from './Button';
+import { AlertIcon } from './icons';
+
 interface ErrorAlertProps {
   title?: string;
   message: string;
@@ -6,18 +9,17 @@ interface ErrorAlertProps {
 
 export function ErrorAlert({ title, message, onRetry }: ErrorAlertProps) {
   return (
-    <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-4 text-red-800">
-      {title ? <p className="font-semibold">{title}</p> : null}
-      <p>{message}</p>
-      {onRetry ? (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-        >
-          Reintentar
-        </button>
-      ) : null}
+    <div role="alert" className="flex gap-3 rounded-card border border-danger/30 bg-danger-soft p-4 text-danger">
+      <AlertIcon className="mt-0.5 h-5 w-5 shrink-0" />
+      <div className="min-w-0 flex-1">
+        {title ? <p className="font-semibold">{title}</p> : null}
+        <p>{message}</p>
+        {onRetry ? (
+          <Button variant="secondary" onClick={onRetry} className="mt-3 px-4! py-1.5!">
+            Reintentar
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }

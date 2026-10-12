@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
+import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { getApiErrorMessage } from '@/shared/lib/api-client';
@@ -19,13 +19,10 @@ export function UploadDetail({ id }: { id: string }) {
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-slate-900">Detalle del upload</h1>
-        <Link
-          href="/uploads"
-          className="rounded text-sm font-medium text-emerald-800 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
-        >
+        <h1 className="text-3xl font-bold tracking-tight text-primary">Detalle del upload</h1>
+        <Button href="/uploads" variant="secondary">
           Volver a la lista
-        </Link>
+        </Button>
       </div>
 
       {isPending ? <LoadingSpinner /> : null}
@@ -33,35 +30,35 @@ export function UploadDetail({ id }: { id: string }) {
 
       {upload ? (
         <>
-          <dl className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 sm:grid-cols-2">
+          <dl className="grid gap-4 rounded-card border border-line bg-surface p-5 shadow-card sm:grid-cols-2">
             <div>
-              <dt className="text-sm text-slate-600">Archivo</dt>
-              <dd className="break-all font-medium text-slate-900">{upload.fileName}</dd>
+              <dt className="text-sm text-ink-muted">Archivo</dt>
+              <dd className="break-all font-medium text-ink">{upload.fileName}</dd>
             </div>
             <div>
-              <dt className="text-sm text-slate-600">Estado</dt>
+              <dt className="text-sm text-ink-muted">Estado</dt>
               <dd className="mt-0.5">
                 <ProcessingStatus upload={upload} />
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-slate-600">Fecha de subida</dt>
-              <dd className="tabular-nums text-slate-900">{formatDateTime(upload.createdAt)}</dd>
+              <dt className="text-sm text-ink-muted">Fecha de subida</dt>
+              <dd className="tabular-nums text-ink">{formatDateTime(upload.createdAt)}</dd>
             </div>
             <div>
-              <dt className="text-sm text-slate-600">Última actualización</dt>
-              <dd className="tabular-nums text-slate-900">{formatDateTime(upload.updatedAt)}</dd>
+              <dt className="text-sm text-ink-muted">Última actualización</dt>
+              <dd className="tabular-nums text-ink">{formatDateTime(upload.updatedAt)}</dd>
             </div>
           </dl>
 
           {upload.status === 'COMPLETED' ? (
             <>
-              <p className="text-slate-800">
+              <p className="text-ink">
                 Filas procesadas: {upload.processedRows ?? 0} · Filas con errores: {upload.failedRows ?? 0}
               </p>
 
               <div className="space-y-3">
-                <h2 className="text-lg font-semibold text-slate-900">Datos procesados</h2>
+                <h2 className="text-xl font-bold tracking-tight text-primary">Datos procesados</h2>
                 {results.isPending ? <LoadingSpinner /> : null}
                 {results.isError ? (
                   <ErrorAlert message={getApiErrorMessage(results.error)} onRetry={() => void results.refetch()} />
@@ -78,7 +75,7 @@ export function UploadDetail({ id }: { id: string }) {
 
               {(upload.failedRows ?? 0) > 0 ? (
                 <div className="space-y-3">
-                  <h2 className="text-lg font-semibold text-slate-900">Filas con errores</h2>
+                  <h2 className="text-xl font-bold tracking-tight text-primary">Filas con errores</h2>
                   <RowErrorsTable errors={upload.rowErrors} failedRows={upload.failedRows ?? 0} />
                 </div>
               ) : null}
@@ -93,7 +90,7 @@ export function UploadDetail({ id }: { id: string }) {
               />
               {upload.rowErrors.length > 0 ? (
                 <div className="space-y-3">
-                  <h2 className="text-lg font-semibold text-slate-900">Filas con errores</h2>
+                  <h2 className="text-xl font-bold tracking-tight text-primary">Filas con errores</h2>
                   <RowErrorsTable errors={upload.rowErrors} failedRows={upload.failedRows ?? upload.rowErrors.length} />
                 </div>
               ) : null}

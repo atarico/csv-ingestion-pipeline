@@ -12,9 +12,9 @@ export function ProgressBar({ value, label }: ProgressBarProps) {
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={clamped}
-      className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200"
+      className="h-2.5 w-full overflow-hidden rounded-full bg-line"
     >
-      <div className="h-full rounded-full bg-emerald-600 transition-[width] duration-500" style={{ width: `${clamped}%` }} />
+      <div className="h-full rounded-full bg-accent transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${clamped}%` }} />
     </div>
   );
 }
