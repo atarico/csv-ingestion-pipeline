@@ -53,12 +53,16 @@ export class CsvParseCsvParser implements ICsvParser {
         await onRecord(record as CsvRecord, rowNumber);
       }
       // csv-parse emits nothing for empty input, so the header flag is what detects it.
-      if (!state.headerSeen) return Either.left(new CsvFormatError('CSV is empty'));
+      if (!state.headerSeen) return Either.left(new CsvFormatError('CSV is empty', 'EMPTY_FILE'));
       return Either.right(rowNumber);
     } catch (error) {
       if (state.headerError !== null) return Either.left(state.headerError);
       if (error instanceof CsvError) {
-        return Either.left(new CsvFormatError(`Malformed CSV: ${error.message}`));
+        return Either.left(
+          new CsvFormatError(`Malformed CSV: ${error.message}`, 'MALFORMED_CSV', {
+            reason: error.message,
+          }),
+        );
       }
       throw error; // storage/stream failures are not CSV format errors
     } finally {

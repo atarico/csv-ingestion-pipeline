@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileName } from '../value-objects/FileName.js';
 import { UploadStatus } from '../value-objects/UploadStatus.js';
 import type { RowError } from './RowError.js';
-import { Upload } from './Upload.js';
+import { Upload, type UploadFailure } from './Upload.js';
 
 function newUpload(): Upload {
   const fileName = FileName.create('mi archivo.csv');
@@ -17,7 +17,27 @@ function processing(totalRows = 10): Upload {
 }
 
 function errors(count: number): RowError[] {
-  return Array.from({ length: count }, (_, i) => ({ row: i + 1, field: 'amount', message: 'bad' }));
+  return Array.from({ length: count }, (_, i) => ({
+    row: i + 1,
+    field: 'amount',
+    code: 'INVALID_NUMBER',
+    message: 'bad',
+  }));
+}
+
+function failure(message: string, overrides: Partial<UploadFailure> = {}): UploadFailure {
+  return { code: 'PROCESSING_ERROR', message, ...overrides };
+}
+
+/** A PROCESSING upload that still carries failure fields, as a redelivered message could find it. */
+function withStaleFailure(): Upload {
+  const base = processing();
+  return Upload.reconstitute(base.id, {
+    ...base.toProps(),
+    errorMessage: 'old failure',
+    errorCode: 'PROCESSING_ERROR',
+    errorDetails: { attempts: 3 },
+  });
 }
 
 describe('Upload', () => {
@@ -39,6 +59,8 @@ describe('Upload', () => {
     expect(upload.processedRows).toBeNull();
     expect(upload.failedRows).toBeNull();
     expect(upload.errorMessage).toBeNull();
+    expect(upload.errorCode).toBeNull();
+    expect(upload.errorDetails).toBeNull();
     expect(upload.rowErrors).toEqual([]);
     expect(upload.createdAt.toISOString()).toBe('2024-01-01T00:00:00.000Z');
     expect(upload.updatedAt).toEqual(upload.createdAt);
@@ -70,7 +92,7 @@ describe('Upload', () => {
     const completed = processing();
     completed.complete({ processedRows: 5, failedRows: 0, rowErrors: [] });
     const failed = newUpload();
-    failed.fail('bad header');
+    failed.fail(failure('bad header'));
     for (const upload of [completed, failed]) {
       const before = upload.status;
       const result = upload.startProcessing(3);
@@ -109,6 +131,44 @@ describe('Upload', () => {
     expect(upload.errorMessage).toBeNull();
   });
 
+  it('complete clears errorMessage, errorCode and errorDetails', () => {
+    const upload = withStaleFailure();
+    expect(upload.complete({ processedRows: 1, failedRows: 0, rowErrors: [] }).isRight()).toBe(
+      true,
+    );
+    expect(upload.errorMessage).toBeNull();
+    expect(upload.errorCode).toBeNull();
+    expect(upload.errorDetails).toBeNull();
+  });
+
+  it('startProcessing clears errorMessage, errorCode and errorDetails', () => {
+    const upload = withStaleFailure();
+    expect(upload.startProcessing(2).isRight()).toBe(true);
+    expect(upload.errorMessage).toBeNull();
+    expect(upload.errorCode).toBeNull();
+    expect(upload.errorDetails).toBeNull();
+  });
+
+  it('fail stores the code, message and details', () => {
+    const upload = newUpload();
+    upload.fail(
+      failure('Invalid CSV header: missing [date]', {
+        code: 'INVALID_HEADER',
+        details: { missing: ['date'] },
+      }),
+    );
+    expect(upload.errorCode).toBe('INVALID_HEADER');
+    expect(upload.errorMessage).toBe('Invalid CSV header: missing [date]');
+    expect(upload.errorDetails).toEqual({ missing: ['date'] });
+  });
+
+  it('fail without details stores null details', () => {
+    const upload = newUpload();
+    upload.fail(failure('boom'));
+    expect(upload.errorCode).toBe('PROCESSING_ERROR');
+    expect(upload.errorDetails).toBeNull();
+  });
+
   it('complete with zero processedRows returns Left ValidationError', () => {
     const upload = processing();
     const result = upload.complete({ processedRows: 0, failedRows: 3, rowErrors: [] });
@@ -130,7 +190,7 @@ describe('Upload', () => {
 
   it('fail from PENDING and PROCESSING sets FAILED with message', () => {
     for (const upload of [newUpload(), processing()]) {
-      expect(upload.fail('Invalid header').isRight()).toBe(true);
+      expect(upload.fail(failure('Invalid header')).isRight()).toBe(true);
       expect(upload.status).toBe(UploadStatus.FAILED);
       expect(upload.errorMessage).toBe('Invalid header');
     }
@@ -138,7 +198,7 @@ describe('Upload', () => {
 
   it('fail with counts stores processedRows, failedRows and capped rowErrors', () => {
     const upload = newUpload();
-    const result = upload.fail('zero valid rows', {
+    const result = upload.fail(failure('zero valid rows'), {
       processedRows: 0,
       failedRows: 150,
       rowErrors: errors(150),
@@ -152,14 +212,14 @@ describe('Upload', () => {
 
   it('fail with counts keeps totalRows when already set', () => {
     const upload = processing(200);
-    upload.fail('zero valid rows', { processedRows: 0, failedRows: 150, rowErrors: [] });
+    upload.fail(failure('zero valid rows'), { processedRows: 0, failedRows: 150, rowErrors: [] });
     expect(upload.totalRows).toBe(200);
   });
 
   it('fail without counts leaves counts untouched', () => {
     const upload = processing(10);
     upload.recordProgress(4, 2);
-    upload.fail('storage object missing');
+    upload.fail(failure('storage object missing'));
     expect(upload.processedRows).toBe(4);
     expect(upload.failedRows).toBe(2);
     expect(upload.totalRows).toBe(10);
@@ -169,7 +229,7 @@ describe('Upload', () => {
   it('fail from COMPLETED returns Left', () => {
     const upload = processing();
     upload.complete({ processedRows: 1, failedRows: 0, rowErrors: [] });
-    const result = upload.fail('late failure');
+    const result = upload.fail(failure('late failure'));
     expect(result.isLeft()).toBe(true);
     expect(upload.status).toBe(UploadStatus.COMPLETED);
     expect(upload.errorMessage).toBeNull();
@@ -202,6 +262,8 @@ describe('Upload', () => {
       processedRows: 3,
       failedRows: 0,
       errorMessage: null,
+      errorCode: null,
+      errorDetails: null,
       rowErrors: [],
       createdAt: original.createdAt,
       updatedAt: original.updatedAt,
@@ -212,19 +274,29 @@ describe('Upload', () => {
 
   it('toProps returns a copy that cannot mutate the entity', () => {
     const upload = processing();
-    upload.fail('boom', { processedRows: 1, failedRows: 2, rowErrors: errors(2) });
+    upload.fail(failure('boom', { details: { attempts: ['a'] } }), {
+      processedRows: 1,
+      failedRows: 2,
+      rowErrors: errors(2),
+    });
 
     const props = upload.toProps();
     expect(props.status).toBe(UploadStatus.FAILED);
     expect(props.rowErrors).toEqual(errors(2));
 
-    props.rowErrors.push({ row: 99, message: 'tampered' });
+    props.rowErrors.push({ row: 99, code: 'INVALID', message: 'tampered' });
     props.rowErrors[0]!.message = 'tampered';
     props.createdAt.setUTCFullYear(1999);
     props.processedRows = 42;
+    props.errorDetails = { tampered: true };
 
     expect(upload.rowErrors).toEqual(errors(2));
     expect(upload.createdAt.getUTCFullYear()).toBe(2024);
     expect(upload.processedRows).toBe(1);
+    expect(upload.errorDetails).toEqual({ attempts: ['a'] });
+
+    const details = upload.toProps().errorDetails as { attempts: string[] };
+    details.attempts.push('tampered');
+    expect(upload.errorDetails).toEqual({ attempts: ['a'] });
   });
 });

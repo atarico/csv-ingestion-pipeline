@@ -1,5 +1,5 @@
 import { Either } from '../../../shared/domain/Either.js';
-import { ValidationError } from '../../../shared/domain/DomainError.js';
+import { ValidationError, type FieldErrorCode } from '../../../shared/domain/DomainError.js';
 import { ValueObject } from '../../../shared/domain/ValueObject.js';
 
 export class Amount extends ValueObject<{ value: number; raw: string }> {
@@ -10,20 +10,20 @@ export class Amount extends ValueObject<{ value: number; raw: string }> {
   }
 
   static create(raw: unknown, field = 'amount'): Either<ValidationError, Amount> {
-    const fail = (message: string): Either<ValidationError, never> =>
-      Either.left(new ValidationError(message, [{ field, message }]));
+    const fail = (code: FieldErrorCode, message: string): Either<ValidationError, never> =>
+      Either.left(new ValidationError(message, [{ field, message, code }]));
 
     let text: string;
     if (typeof raw === 'number') text = String(raw);
     else if (typeof raw === 'string') text = raw;
-    else return fail(`${field} is required`);
+    else return fail('REQUIRED', `${field} is required`);
 
     text = text.trim();
-    if (text.length === 0) return fail(`${field} is required`);
+    if (text.length === 0) return fail('REQUIRED', `${field} is required`);
     if (!Amount.PATTERN.test(text))
-      return fail(`${field} must be a positive number with at most 4 decimals`);
+      return fail('INVALID_NUMBER', `${field} must be a positive number with at most 4 decimals`);
     const value = Number(text);
-    if (value <= 0) return fail(`${field} must be greater than 0`);
+    if (value <= 0) return fail('NOT_POSITIVE', `${field} must be greater than 0`);
     return Either.right(new Amount(value, text));
   }
 

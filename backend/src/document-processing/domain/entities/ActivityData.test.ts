@@ -36,6 +36,25 @@ describe('ActivityData', () => {
     }
   });
 
+  it('propagates the code of every invalid field', () => {
+    const result = ActivityData.create({
+      ...valid,
+      category: '',
+      amount: '-1',
+      unit: 'k\u0007Wh',
+      date: '2024-02-30',
+    });
+    expect(result.isLeft()).toBe(true);
+    if (result.isLeft()) {
+      expect(result.value.fieldErrors.map((e) => [e.field, e.code])).toEqual([
+        ['category', 'REQUIRED'],
+        ['amount', 'INVALID_NUMBER'],
+        ['unit', 'CONTROL_CHARACTERS'],
+        ['date', 'INVALID_DATE'],
+      ]);
+    }
+  });
+
   it('generates distinct ids', () => {
     const a = ActivityData.create(valid);
     const b = ActivityData.create(valid);

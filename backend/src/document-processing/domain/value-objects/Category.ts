@@ -3,7 +3,7 @@ import {
   CONTROL_CHARACTERS_MESSAGE,
   hasControlCharacters,
 } from '../../../shared/domain/ControlCharacters.js';
-import { ValidationError } from '../../../shared/domain/DomainError.js';
+import { ValidationError, type FieldErrorCode } from '../../../shared/domain/DomainError.js';
 import { ValueObject } from '../../../shared/domain/ValueObject.js';
 
 export class Category extends ValueObject<{ value: string }> {
@@ -14,14 +14,14 @@ export class Category extends ValueObject<{ value: string }> {
   }
 
   static create(raw: unknown, field = 'category'): Either<ValidationError, Category> {
-    const fail = (message: string): Either<ValidationError, never> =>
-      Either.left(new ValidationError(message, [{ field, message }]));
+    const fail = (code: FieldErrorCode, message: string): Either<ValidationError, never> =>
+      Either.left(new ValidationError(message, [{ field, message, code }]));
 
     const value = typeof raw === 'string' ? raw.trim() : '';
-    if (value.length === 0) return fail(`${field} is required`);
-    if (hasControlCharacters(value)) return fail(CONTROL_CHARACTERS_MESSAGE);
+    if (value.length === 0) return fail('REQUIRED', `${field} is required`);
+    if (hasControlCharacters(value)) return fail('CONTROL_CHARACTERS', CONTROL_CHARACTERS_MESSAGE);
     if (value.length > Category.MAX_LENGTH)
-      return fail(`${field} must be at most ${Category.MAX_LENGTH} characters`);
+      return fail('TOO_LONG', `${field} must be at most ${Category.MAX_LENGTH} characters`);
     return Either.right(new Category(value));
   }
 

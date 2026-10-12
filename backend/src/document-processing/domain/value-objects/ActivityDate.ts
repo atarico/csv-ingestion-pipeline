@@ -1,5 +1,5 @@
 import { Either } from '../../../shared/domain/Either.js';
-import { ValidationError } from '../../../shared/domain/DomainError.js';
+import { ValidationError, type FieldErrorCode } from '../../../shared/domain/DomainError.js';
 import { ValueObject } from '../../../shared/domain/ValueObject.js';
 
 export class ActivityDate extends ValueObject<{ value: string }> {
@@ -10,12 +10,14 @@ export class ActivityDate extends ValueObject<{ value: string }> {
   }
 
   static create(raw: unknown, field = 'date'): Either<ValidationError, ActivityDate> {
-    const fail = (message: string): Either<ValidationError, never> =>
-      Either.left(new ValidationError(message, [{ field, message }]));
+    const fail = (code: FieldErrorCode, message: string): Either<ValidationError, never> =>
+      Either.left(new ValidationError(message, [{ field, message, code }]));
 
-    if (typeof raw !== 'string' || raw.trim().length === 0) return fail(`${field} is required`);
+    if (typeof raw !== 'string' || raw.trim().length === 0)
+      return fail('REQUIRED', `${field} is required`);
     const text = raw.trim();
-    if (!ActivityDate.PATTERN.test(text)) return fail(`${field} must use the format YYYY-MM-DD`);
+    if (!ActivityDate.PATTERN.test(text))
+      return fail('INVALID_DATE_FORMAT', `${field} must use the format YYYY-MM-DD`);
 
     const [year = 0, month = 0, day = 0] = text.split('-').map(Number);
     const built = new Date(Date.UTC(year, month - 1, day));
@@ -23,7 +25,7 @@ export class ActivityDate extends ValueObject<{ value: string }> {
       built.getUTCFullYear() === year &&
       built.getUTCMonth() === month - 1 &&
       built.getUTCDate() === day;
-    if (!isRealDate) return fail(`${field} is not a valid calendar date`);
+    if (!isRealDate) return fail('INVALID_DATE', `${field} is not a valid calendar date`);
     return Either.right(new ActivityDate(text));
   }
 

@@ -4,17 +4,48 @@ import type { ILogger } from '../../../../shared/application/ports/ILogger.js';
 import {
   InvalidStateTransitionError,
   NotFoundError,
+  type CsvFormatError,
   type DomainError,
 } from '../../../../shared/domain/DomainError.js';
+import { hasControlCharacters } from '../../../../shared/domain/ControlCharacters.js';
 import { Either } from '../../../../shared/domain/Either.js';
 import { ActivityData } from '../../../domain/entities/ActivityData.js';
-import { MAX_STORED_ROW_ERRORS, type RowError } from '../../../domain/entities/RowError.js';
-import type { FailureCounts, Upload } from '../../../domain/entities/Upload.js';
+import {
+  MAX_ROW_ERROR_VALUE_LENGTH,
+  MAX_STORED_ROW_ERRORS,
+  type RowError,
+} from '../../../domain/entities/RowError.js';
+import type { FailureCounts, Upload, UploadFailure } from '../../../domain/entities/Upload.js';
 import type { IActivityDataRepository } from '../../../domain/repositories/IActivityDataRepository.js';
 import type { IUploadRepository } from '../../../domain/repositories/IUploadRepository.js';
 import type { ProcessFileResult } from '../../dtos/UploadDtos.js';
-import type { ICsvParser } from '../../ports/ICsvParser.js';
+import type { CsvRecord, ICsvParser } from '../../ports/ICsvParser.js';
 import type { ProcessFileCommand } from '../objects/ProcessFileCommand.js';
+
+function csvFailure(error: CsvFormatError): UploadFailure {
+  return {
+    code: error.failureCode,
+    message: error.message,
+    ...(error.failureDetails === undefined ? {} : { details: error.failureDetails }),
+  };
+}
+
+/**
+ * The trimmed cell behind a field error, cut to the stored maximum; undefined when empty.
+ * Control characters become U+FFFD because Postgres jsonb rejects \u0000 and the value is display-only.
+ */
+function offendingValue(record: CsvRecord, field: string): string | undefined {
+  const trimmed = record[field]?.trim() ?? '';
+  if (trimmed.length === 0) return undefined;
+  const printable = Array.from(trimmed, (char) =>
+    hasControlCharacters(char) ? '\uFFFD' : char,
+  ).join('');
+  // Array.from walks code points, so a cut never splits a surrogate pair.
+  const points = Array.from(printable);
+  return points.length > MAX_ROW_ERROR_VALUE_LENGTH
+    ? `${points.slice(0, MAX_ROW_ERROR_VALUE_LENGTH).join('')}\u2026`
+    : printable;
+}
 
 export class ProcessFileCommandHandler implements ICommandHandler<
   ProcessFileCommand,
@@ -49,7 +80,7 @@ export class ProcessFileCommandHandler implements ICommandHandler<
     if (counted.isLeft()) {
       return this.finishFailed(
         upload,
-        counted.value.message,
+        csvFailure(counted.value),
         undefined,
         { uploadId, status: 'FAILED', totalRows: 0, processedRows: 0, failedRows: 0 },
         startedAt,
@@ -59,7 +90,7 @@ export class ProcessFileCommandHandler implements ICommandHandler<
     if (totalRows === 0) {
       return this.finishFailed(
         upload,
-        'CSV has no data rows',
+        { code: 'NO_DATA_ROWS', message: 'CSV has no data rows' },
         { processedRows: 0, failedRows: 0, rowErrors: [] },
         { uploadId, status: 'FAILED', totalRows: 0, processedRows: 0, failedRows: 0 },
         startedAt,
@@ -100,10 +131,13 @@ export class ProcessFileCommandHandler implements ICommandHandler<
         failed += 1;
         for (const fieldError of row.value.fieldErrors) {
           if (rowErrors.length >= MAX_STORED_ROW_ERRORS) break;
+          const value = offendingValue(record, fieldError.field);
           rowErrors.push({
             row: rowNumber,
             field: fieldError.field,
+            code: fieldError.code ?? 'INVALID',
             message: fieldError.message,
+            ...(value === undefined ? {} : { value }),
           });
         }
       }
@@ -124,7 +158,7 @@ export class ProcessFileCommandHandler implements ICommandHandler<
       // it is reachable only with a parser that fails mid-stream.
       return this.finishFailed(
         upload,
-        parsed.value.message,
+        csvFailure(parsed.value),
         { processedRows: processed, failedRows: failed, rowErrors },
         { uploadId, status: 'FAILED', totalRows, processedRows: processed, failedRows: failed },
         startedAt,
@@ -137,7 +171,7 @@ export class ProcessFileCommandHandler implements ICommandHandler<
     if (processed === 0) {
       return this.finishFailed(
         upload,
-        'No valid rows found',
+        { code: 'NO_VALID_ROWS', message: 'No valid rows found' },
         { processedRows: 0, failedRows: failed, rowErrors },
         { uploadId, status: 'FAILED', totalRows, processedRows: 0, failedRows: failed },
         startedAt,
@@ -162,12 +196,12 @@ export class ProcessFileCommandHandler implements ICommandHandler<
   /** Marks the upload FAILED, persists it and reports the business outcome as a Right. */
   private async finishFailed(
     upload: Upload,
-    message: string,
+    failure: UploadFailure,
     counts: FailureCounts | undefined,
     result: ProcessFileResult,
     startedAt: number,
   ): Promise<Either<DomainError, ProcessFileResult>> {
-    const failed = upload.fail(message, counts);
+    const failed = upload.fail(failure, counts);
     if (failed.isLeft()) return Either.left(failed.value);
     await this.uploadRepository.save(upload);
     this.logEnd(result, startedAt);

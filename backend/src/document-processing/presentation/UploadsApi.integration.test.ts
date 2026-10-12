@@ -81,6 +81,8 @@ async function seedUpload(
           processedRows: null,
           failedRows: null,
           errorMessage: null,
+          errorCode: null,
+          errorDetails: null,
           rowErrors: [],
           createdAt,
           updatedAt: createdAt,
@@ -290,6 +292,52 @@ describe('Uploads REST API', () => {
         status: 'PENDING',
         rowErrors: [],
         errorMessage: null,
+        errorCode: null,
+        errorDetails: null,
+      });
+    });
+
+    it('exposes errorCode and errorDetails of a FAILED upload', async () => {
+      const upload = await seedUpload(uploads);
+      upload.fail({
+        code: 'INVALID_HEADER',
+        message: 'Invalid CSV header: missing [date]',
+        details: { expected: ['category', 'amount', 'unit', 'date'], missing: ['date'] },
+      });
+      await uploads.save(upload);
+
+      const response = await ctx.app.inject({ method: 'GET', url: `${API}/uploads/${upload.id}` });
+
+      expect(response.json()).toMatchObject({
+        status: 'FAILED',
+        errorMessage: 'Invalid CSV header: missing [date]',
+        errorCode: 'INVALID_HEADER',
+        errorDetails: { missing: ['date'] },
+      });
+    });
+
+    it('exposes code and value on the rowErrors of a COMPLETED upload', async () => {
+      const upload = await seedUpload(uploads);
+      upload.startProcessing(2);
+      upload.complete({
+        processedRows: 1,
+        failedRows: 1,
+        rowErrors: [
+          { row: 2, field: 'amount', code: 'INVALID_NUMBER', message: 'bad', value: 'abc' },
+        ],
+      });
+      await uploads.save(upload);
+
+      const response = await ctx.app.inject({ method: 'GET', url: `${API}/uploads/${upload.id}` });
+
+      const body = response.json<{ rowErrors: unknown[]; errorCode: string | null }>();
+      expect(body.errorCode).toBeNull();
+      expect(body.rowErrors[0]).toEqual({
+        row: 2,
+        field: 'amount',
+        code: 'INVALID_NUMBER',
+        message: 'bad',
+        value: 'abc',
       });
     });
 
@@ -338,7 +386,10 @@ describe('Uploads REST API', () => {
     });
 
     it('page=999999999 returns 400', async () => {
-      const response = await ctx.app.inject({ method: 'GET', url: `${API}/uploads?page=999999999` });
+      const response = await ctx.app.inject({
+        method: 'GET',
+        url: `${API}/uploads?page=999999999`,
+      });
       expect(response.statusCode).toBe(400);
       expect(response.json<{ error: { code: string } }>().error.code).toBe('VALIDATION_ERROR');
     });
@@ -353,7 +404,7 @@ describe('Uploads REST API', () => {
   it('GET /uploads/stats returns counts per status and total', async () => {
     await seedUpload(uploads, 'a.csv');
     const failed = await seedUpload(uploads, 'b.csv');
-    failed.fail('boom');
+    failed.fail({ code: 'PROCESSING_ERROR', message: 'boom' });
     await uploads.save(failed);
 
     const response = await ctx.app.inject({ method: 'GET', url: `${API}/uploads/stats` });

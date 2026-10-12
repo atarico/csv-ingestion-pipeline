@@ -20,6 +20,7 @@ describe('Category', () => {
       if (result.isLeft()) {
         expect(result.value.message).toBe('category is required');
         expect(result.value.fieldErrors[0]?.field).toBe('category');
+        expect(result.value.fieldErrors[0]?.code).toBe('REQUIRED');
       }
     }
   });
@@ -27,6 +28,7 @@ describe('Category', () => {
   it('rejects 101 chars', () => {
     const result = Category.create('a'.repeat(101));
     expect(result.isLeft() && result.value.message).toBe('category must be at most 100 characters');
+    expect(result.isLeft() && result.value.fieldErrors[0]?.code).toBe('TOO_LONG');
     expect(Category.create('a'.repeat(100)).isRight()).toBe(true);
   });
 
@@ -38,6 +40,7 @@ describe('Category', () => {
       expect(result.value.fieldErrors[0]).toEqual({
         field: 'category',
         message: 'must not contain control characters',
+        code: 'CONTROL_CHARACTERS',
       });
     }
   });
@@ -52,6 +55,7 @@ describe('Unit', () => {
   it('rejects 21 chars', () => {
     const result = Unit.create('u'.repeat(21));
     expect(result.isLeft() && result.value.message).toBe('unit must be at most 20 characters');
+    expect(result.isLeft() && result.value.fieldErrors[0]?.code).toBe('TOO_LONG');
     expect(Unit.create('u'.repeat(20)).isRight()).toBe(true);
   });
 
@@ -61,6 +65,7 @@ describe('Unit', () => {
     if (result.isLeft()) {
       expect(result.value.message).toBe('must not contain control characters');
       expect(result.value.fieldErrors[0]?.field).toBe('unit');
+      expect(result.value.fieldErrors[0]?.code).toBe('CONTROL_CHARACTERS');
     }
   });
 
@@ -70,6 +75,7 @@ describe('Unit', () => {
     if (result.isLeft()) {
       expect(result.value.message).toBe('measure is required');
       expect(result.value.fieldErrors[0]?.field).toBe('measure');
+      expect(result.value.fieldErrors[0]?.code).toBe('REQUIRED');
     }
   });
 });

@@ -71,8 +71,10 @@ describe('DomainError hierarchy', () => {
   });
 
   it('CsvFormatError maps to 422', () => {
-    const error = new CsvFormatError('bad header');
+    const error = new CsvFormatError('bad header', 'INVALID_HEADER', { missing: ['date'] });
     expect(error.code).toBe('CSV_FORMAT_ERROR');
+    expect(error.failureCode).toBe('INVALID_HEADER');
+    expect(error.failureDetails).toEqual({ missing: ['date'] });
     expect(error.httpStatus).toBe(422);
     expect(error.name).toBe('CsvFormatError');
     expect(error.message).toBe('bad header');

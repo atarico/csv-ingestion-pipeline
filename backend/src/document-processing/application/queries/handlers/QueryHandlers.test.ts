@@ -27,7 +27,9 @@ function buildUpload(options: { userId?: string; status?: UploadStatus; createdA
     processedRows: null,
     failedRows: null,
     errorMessage: null,
-    rowErrors: [{ row: 2, field: 'amount', message: 'bad' }],
+    errorCode: null,
+    errorDetails: null,
+    rowErrors: [{ row: 2, field: 'amount', code: 'INVALID_NUMBER', message: 'bad' }],
     createdAt,
     updatedAt: createdAt,
   });
@@ -74,7 +76,9 @@ describe('query handlers', () => {
         processedRows: null,
         failedRows: null,
         errorMessage: null,
-        rowErrors: [{ row: 2, field: 'amount', message: 'bad' }],
+        errorCode: null,
+        errorDetails: null,
+        rowErrors: [{ row: 2, field: 'amount', code: 'INVALID_NUMBER', message: 'bad' }],
         createdAt: upload.createdAt.toISOString(),
         updatedAt: upload.updatedAt.toISOString(),
       });

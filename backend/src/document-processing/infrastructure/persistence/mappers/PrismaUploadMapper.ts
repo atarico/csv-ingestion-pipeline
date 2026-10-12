@@ -1,16 +1,31 @@
 import * as z from 'zod';
-import type { Prisma, Upload as UploadRecord } from '../../../../generated/prisma/client.js';
-import { Upload } from '../../../domain/entities/Upload.js';
+import { Prisma, type Upload as UploadRecord } from '../../../../generated/prisma/client.js';
+import { FIELD_ERROR_CODES } from '../../../../shared/domain/DomainError.js';
+import { Upload, UPLOAD_FAILURE_CODES } from '../../../domain/entities/Upload.js';
 import { FileName } from '../../../domain/value-objects/FileName.js';
 import { UploadStatus } from '../../../domain/value-objects/UploadStatus.js';
 
 const RowErrorsSchema = z.array(
-  z.object({ row: z.number().int(), field: z.string().optional(), message: z.string() }),
+  z.object({
+    row: z.number().int(),
+    field: z.string().optional(),
+    // Records written before error codes existed carry no `code`; unknown codes degrade the same way.
+    code: z.enum([...FIELD_ERROR_CODES, 'INVALID']).catch('INVALID'),
+    message: z.string(),
+    value: z.string().optional(),
+  }),
 );
 
-/** Every column except `updatedAt`, which Prisma maintains (`@updatedAt`); `rowErrors` is always an array. */
-export type UploadPersistence = Omit<UploadRecord, 'updatedAt' | 'rowErrors'> & {
+const ErrorCodeSchema = z.enum(UPLOAD_FAILURE_CODES).nullable();
+const ErrorDetailsSchema = z.record(z.string(), z.unknown()).nullable();
+
+/**
+ * Every column except `updatedAt`, which Prisma maintains (`@updatedAt`); `rowErrors` is always an array
+ * and `errorDetails` uses `Prisma.DbNull` because Prisma rejects a plain `null` for Json input.
+ */
+export type UploadPersistence = Omit<UploadRecord, 'updatedAt' | 'rowErrors' | 'errorDetails'> & {
   rowErrors: Prisma.InputJsonArray;
+  errorDetails: Prisma.InputJsonValue | typeof Prisma.DbNull;
 };
 
 export const PrismaUploadMapper = {
@@ -21,6 +36,8 @@ export const PrismaUploadMapper = {
     if (status.isLeft()) throw new Error('Corrupted status in database');
 
     const parsedRowErrors = RowErrorsSchema.safeParse(record.rowErrors ?? []);
+    const parsedErrorCode = ErrorCodeSchema.safeParse(record.errorCode);
+    const parsedErrorDetails = ErrorDetailsSchema.safeParse(record.errorDetails);
     return Upload.reconstitute(record.id, {
       fileName: fileName.value,
       fileKey: record.fileKey,
@@ -30,7 +47,9 @@ export const PrismaUploadMapper = {
       processedRows: record.processedRows,
       failedRows: record.failedRows,
       errorMessage: record.errorMessage,
-      // The mapper is pure: invalid JSON degrades to an empty list without logging.
+      // The mapper is pure: invalid JSON degrades to empty values without logging.
+      errorCode: parsedErrorCode.success ? parsedErrorCode.data : null,
+      errorDetails: parsedErrorDetails.success ? parsedErrorDetails.data : null,
       rowErrors: parsedRowErrors.success ? parsedRowErrors.data : [],
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
@@ -48,6 +67,12 @@ export const PrismaUploadMapper = {
       processedRows: upload.processedRows,
       failedRows: upload.failedRows,
       errorMessage: upload.errorMessage,
+      errorCode: upload.errorCode,
+      // Details are built from JSON-safe values (strings, arrays, records) in the domain.
+      errorDetails:
+        upload.errorDetails === null
+          ? Prisma.DbNull
+          : (upload.errorDetails as Prisma.InputJsonObject),
       rowErrors: upload.rowErrors.map((error) => ({ ...error })), // plain objects: valid Json
       createdAt: upload.createdAt,
     };

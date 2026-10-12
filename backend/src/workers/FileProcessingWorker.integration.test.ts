@@ -11,7 +11,9 @@ interface UploadResponse {
   processedRows: number | null;
   failedRows: number | null;
   errorMessage: string | null;
-  rowErrors: Array<{ row: number; field?: string; message: string }>;
+  errorCode: string | null;
+  errorDetails: Record<string, unknown> | null;
+  rowErrors: Array<{ row: number; field?: string; code: string; message: string; value?: string }>;
 }
 
 /** Valid rows 1..count with distinct dates so ordering by rowNumber is observable. */
@@ -112,6 +114,11 @@ describe('FileProcessingWorker (real Postgres, in-memory storage and queue)', ()
     const upload = await getUpload(id);
     expect(upload.status).toBe('FAILED');
     expect(upload.errorMessage).toContain('Invalid CSV header');
+    expect(upload.errorCode).toBe('INVALID_HEADER');
+    expect(upload.errorDetails).toMatchObject({
+      missing: ['category', 'amount', 'unit', 'date'],
+      unexpected: ['foo', 'bar'],
+    });
     const results = await ctx.app.inject({ method: 'GET', url: `${API}/uploads/${id}/results` });
     expect(results.json<{ data: unknown[] }>().data).toEqual([]);
   });
@@ -126,6 +133,18 @@ describe('FileProcessingWorker (real Postgres, in-memory storage and queue)', ()
     expect(upload.processedRows).toBe(19);
     expect(upload.failedRows).toBe(6);
     expect(upload.rowErrors).toHaveLength(7);
+    expect(upload.errorCode).toBeNull();
+    expect(upload.rowErrors[0]).toMatchObject({
+      row: 4,
+      field: 'amount',
+      code: 'INVALID_NUMBER',
+      value: '-5',
+    });
+    expect(upload.rowErrors[1]).toMatchObject({
+      field: 'amount',
+      code: 'INVALID_NUMBER',
+      value: 'abc',
+    });
   });
 
   it('missing object retries then dead-letters', async () => {
@@ -143,6 +162,7 @@ describe('FileProcessingWorker (real Postgres, in-memory storage and queue)', ()
     const upload = await getUpload(id);
     expect(upload.status).toBe('FAILED');
     expect(upload.errorMessage).toContain('after 3 attempts');
+    expect(upload.errorCode).toBe('PROCESSING_ERROR');
     expect(ctx.queue.visibilityChanges.map((change) => change.timeoutSeconds)).toEqual([15, 30]);
     expect(ctx.queue.inFlightCount).toBe(1);
   });
