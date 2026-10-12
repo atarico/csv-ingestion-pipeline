@@ -1,5 +1,3 @@
-<!-- Borrador en primera persona generado a partir de los hechos del proceso. Validar cada frase antes de enviar. -->
-
 # Uso de Inteligencia Artificial en esta Prueba
 
 ## Herramientas utilizadas
@@ -7,48 +5,90 @@
 - [ ] GitHub Copilot
 - [ ] ChatGPT
 - [ ] Cursor AI
-- [ ] Otra: ________
+- [x] Otra: gentle-ai, un arnés de orquestación sobre Claude Code (seguimiento de tareas y
+      revisión de código con consentimiento por cambio)
 
 ## Cómo se trabajó
 
-Trabajé en tres fases con Claude Code. En una sesión de planificación (2026-10-09)
-revisamos el documento de la prueba técnica, detectamos las inconsistencias que figuran en
-el README en "Decisiones ante ambigüedades del enunciado" (por ejemplo, la cola en memoria
-que no puede compartirse entre procesos, el estado `PROCESSING` que nunca se asignaba o el
-orden entre encolar y crear el registro) y se produjo una especificación por capas (diez
-documentos, de cimientos a entregables) con versiones fijadas y criterios de aceptación.
+Trabajé con Claude Code en sesiones separadas de planificación, ejecución y revisión, y me
+reservé las decisiones: qué construir, qué aceptar, qué corregir y cuándo publicar. Por fases:
 
-En la segunda fase, Claude Code implementó el código capa por capa a partir de esa
-especificación. El agente principal (modelo Opus 5.5) delegó cada capa en sub-agentes
-(modelo Sonnet), que escribieron primero las pruebas y las vieron fallar, implementaron
-hasta que pasaran y ejecutaron `lint`, `typecheck` y las pruebas antes de cada commit. Se
-usó una rama por capa (`feat/01-foundations` a `docs/10-deliverables`), unida a `main` con
-`git merge --no-ff`, y commits convencionales atómicos. La herramienta de
-orquestación evaluaba el riesgo de cada commit y, cuando un grupo de commits era de riesgo
-alto o sumaba unas 400 líneas, ejecutaba una revisión de código automática con mi
-consentimiento (en la ronda de correcciones acepté todas las revisiones propuestas). Sus hallazgos
-no bloqueantes que no se corrigieron están en el README, en "Limitaciones conocidas".
+1. **Lectura crítica del enunciado (2026-10-09).** Antes de escribir código pedí revisar el
+   documento de la prueba buscando contradicciones y errores técnicos. Aparecieron los que
+   figuran en el README en "Decisiones ante ambigüedades del enunciado": la cola en memoria
+   que no puede compartirse entre procesos, el estado `PROCESSING` que nunca se asignaba y el
+   orden entre encolar y crear el registro. Decidí cómo resolver cada uno y quedó escrito.
 
-Después, en una ronda de interfaz, pedí cuatro cosas: aplicar la marca de CarbonBox,
-añadir un tema claro y oscuro, mejorar la respuesta al subir un archivo y hacer que los
-errores digan qué corregir. Escribí la especificación (`12-ux-brand`) en una sesión de
-planificación y Claude Code la ejecutó tarea por tarea, con las pruebas primero, un
-sub-agente escritor por tarea y una revisión automática por cada grupo de commits, con mi
-consentimiento (acepté todas). Revisé visualmente las capturas de pantalla de cada paso.
-Además de este documento, recibí un informe didáctico por capa (fuera del repositorio).
+2. **Especificación por capas, verificada antes de implementar.** En una sesión de
+   planificación se produjo una especificación de diez documentos (de cimientos a
+   entregables) con versiones fijadas y criterios de aceptación. Antes de usarla, un
+   verificador independiente la contrastó con la regla de dependencias de la arquitectura y
+   encontró violaciones (el dominio importaba un tipo de la capa de aplicación; la aplicación
+   importaba la infraestructura) y dos pruebas imposibles tal como estaban escritas. Se
+   corrigieron antes de escribir una línea de código.
 
-En la tercera fase pedí una revisión independiente del resultado, hecha con cuatro
-revisores de código, una evaluación con rúbrica y un verificador que ejecutó cada
-comprobación; produjo `informes/11-revision-completa.md` (fuera del repositorio). A partir
-de ese informe solicité una ronda de correcciones, que Claude Code aplicó en la rama
-`fix/12-review-followups` con un commit por tarea, pruebas primero y una revisión
-automática por cada grupo de commits.
+3. **Implementación capa por capa.** Claude Code implementó cada capa a partir de esa
+   especificación: un agente principal (Opus 5.5) repartía cada capa entre agentes
+   secundarios (Sonnet 5.5), que escribían primero las pruebas y las veían fallar,
+   implementaban hasta que pasaran y ejecutaban `lint`, `typecheck` y las pruebas antes de
+   cada commit. Una rama por capa (`feat/01-foundations` a `docs/10-deliverables`), unida a
+   `main` con `git merge --no-ff`, y commits convencionales atómicos. El arnés gentle-ai
+   evaluaba el riesgo de cada commit y, cuando un grupo de commits era de riesgo alto o
+   sumaba unas 400 líneas, ejecutaba una revisión de código automática que yo autorizaba
+   cada vez; acepté todas las revisiones propuestas. Los hallazgos no bloqueantes que decidí
+   no corregir están en el README, en "Limitaciones conocidas".
+
+4. **Revisión independiente y correcciones.** Terminada la implementación pedí una revisión
+   independiente del resultado, con cuatro revisores de código, una evaluación con rúbrica y
+   un verificador que ejecutó cada comprobación en lugar de fiarse de los informes
+   (`informes/11-revision-completa.md`, fuera del repositorio). A partir de ese informe
+   solicité la ronda de correcciones B1 a B10 (rama `fix/12-review-followups`), con un
+   commit por tarea y pruebas primero.
+
+5. **Revisión final previa a la entrega.** Una segunda revisión independiente
+   (`informes/13-revision-final.md`) encontró que el mapeo de errores de límite del multipart
+   era código muerto (M1). Elegí la corrección real, iterar `request.parts()` y mapear los
+   límites de `@fastify/multipart`, en lugar de borrar el mapeo, y pedí pruebas de
+   integración que la demostraran (rama `fix/13-final-round`), más los retoques de
+   documentación de `docs/14-final-touches`.
+
+6. **Ronda de interfaz.** Pedí cuatro cosas: aplicar la marca de CarbonBox, añadir un tema
+   claro y oscuro, mejorar la respuesta al subir un archivo y hacer que los errores digan
+   qué corregir. La especificación `12-ux-brand` se escribió en una sesión de planificación a
+   partir de ese pedido, un verificador independiente la contrastó con el código (tres
+   bloqueos corregidos antes de ejecutar) y Claude Code la ejecutó tarea por tarea, con las
+   pruebas primero y una revisión automática por cada grupo de commits que autoricé una por
+   una. El informe de la ronda incluye capturas de cada pantalla en ambos temas, generadas
+   contra el stack de Docker Compose.
+
+7. **Verificación de la ronda de interfaz y publicación.** Antes de publicarla pedí una
+   tercera revisión independiente (`informes/16-revision-ux-brand.md`), que repitió todas las
+   suites, la cobertura y las pruebas E2E, lanzó sondas con `curl` contra la API y contrastó
+   el código con la especificación tarea por tarea. Todo lo informado se sostuvo; detectó una
+   oración falsa en el README, que se corrigió en un commit propio antes del push. Cada push
+   a GitHub lo autoricé yo, y cada uno terminó con el CI en verde.
+
+Además de este documento recibí un informe didáctico por capa y por revisión (fuera del
+repositorio), que usé para preparar la defensa del proyecto.
+
+## Decisiones que tomé y cómo las validé
+
+| Decisión | Cómo la validé |
+|----------|----------------|
+| Usar el SDK real de AWS (v3) contra LocalStack, detrás de puertos de la capa de aplicación, en lugar de la cola en memoria del enunciado | El enunciado exige API y worker en procesos separados; una cola en memoria no puede compartirse entre ellos. LocalStack se fijó en la última versión que funciona sin token de autenticación |
+| Una rama por capa, merges `--no-ff`, commits convencionales y sin trailers de atribución | Cada capa cierra con `lint`, `typecheck` y pruebas en verde y la revisión resuelta; la lista de aceptación comprueba `git log` |
+| Pruebas primero como regla, no como excepción | Cada informe registra el comando que falló (RED) y el que pasó (GREEN); la cobertura de líneas del backend quedó en 86,31 % |
+| Revisión de código automática con consentimiento por cambio | Solo en la ronda de interfaz fueron cuatro tramos revisados y aprobados; los informes reproducen el texto literal de cada revisión, no un resumen |
+| Tres rondas de revisión independiente con la instrucción de buscar defectos, no de confirmar | Resultado: B1 a B10 (informe 11), M1 (informe 13) y una oración falsa del README más cuatro observaciones menores (informe 16). Ninguna revisión se dio por buena sin que un verificador ejecutara los comandos |
+| Corrección real de M1 en vez de eliminar el código muerto | Tres pruebas de integración que envían dos archivos, archivo y campo, y campo y archivo, y esperan `400` |
+| Publicar las limitaciones conocidas en el README en lugar de ocultarlas | Aviso de subida impreciso, `value` truncado a 50 caracteres, mensajes de la API en inglés, cobertura real; cada una con su explicación |
+| Push solo con mi autorización y después de verificar | Tres ejecuciones de CI en verde en GitHub: 38084387707, 38101920761 y 38291158893 |
 
 ## Qué se generó con IA
 
 ### Backend
 - [x] Estructura del repositorio, configuración de TypeScript, ESLint, Prettier y Vitest
-- [x] Schema de Prisma 7, migración inicial y configuración con Convict
+- [x] Schema de Prisma 7, migraciones y configuración con Convict
 - [x] Núcleo compartido: `Either`, errores de dominio, entidad base, puertos
 - [x] Modelo de dominio: agregado `Upload`, value objects y repositorios
 - [x] Parser CSV (`csv-parse` detrás de `ICsvParser`) y política de cabecera
@@ -56,19 +96,26 @@ automática por cada grupo de commits.
 - [x] Adaptadores: repositorios Prisma, S3, SQS y contenedor de Awilix
 - [x] API REST con Fastify y manejo de errores centralizado
 - [x] Worker con reintentos con backoff, DLQ y apagado ordenado
-- [x] Pruebas unitarias y de integración (220 en el backend tras la ronda de correcciones)
+- [x] Códigos de error estables (`errorCode`, `errorDetails`, `rowErrors[].code` y `value`) con
+      migración aditiva, en la ronda de interfaz
+- [x] Pruebas unitarias y de integración (247 en el backend: 202 unitarias y 45 de integración)
 
 ### Frontend
 - [x] Scaffold de Next.js 16 con React Query, axios y Tailwind 4
 - [x] Dashboard, listado, formulario de subida y detalle con polling cada 3 s
-- [x] Componentes, hooks y pruebas (44 en el frontend tras la ronda de correcciones)
+- [x] Tokens de diseño de la marca, Poppins autoalojada, logo e icono; tema claro y oscuro
+      persistente sin parpadeo; tarjeta de archivo y diálogo de confirmación; errores
+      explicados en español a partir de los códigos de la API
+- [x] Componentes, hooks y pruebas (146 en el frontend)
 
 ### Infraestructura y documentación
 - [x] Docker Compose con PostgreSQL y LocalStack, y script de inicialización de AWS
 - [x] Dockerfiles y perfil `app` de Compose
-- [x] Capa E2E: paquete `e2e/` con cuatro pruebas de navegador (Playwright, Chromium) contra el stack de Compose, y un job `e2e` en el workflow de CI
-- [x] Workflow de CI de GitHub Actions (no ejecutado en GitHub, ver más abajo)
+- [x] Capa E2E: paquete `e2e/` con cinco pruebas de navegador (Playwright, Chromium) contra el
+      stack de Compose, y un job `e2e` en el workflow de CI
+- [x] Workflow de CI de GitHub Actions (ejecutado en GitHub: ver la lista de aceptación)
 - [x] Ronda de correcciones tras la revisión independiente (ver la sección siguiente)
+- [x] Ronda de interfaz y marca (ver "Cómo se trabajó")
 - [x] Diagramas de flujo y de arquitectura AWS (Mermaid y PNG)
 - [x] Archivos CSV de ejemplo y el generador del archivo grande
 - [x] README, este documento y los informes por capa (estos últimos, fuera del repositorio)
@@ -92,7 +139,8 @@ otra forma:
   y no se podían declinar de forma no interactiva (`cacheComponents`,
   `partialPrefetching` y un loader de `@tailwindcss/turbopack`); Tailwind se fijó en 4.3.3
   mediante PostCSS. Se quitó la fuente de Google (Geist) para que el build funcione sin red.
-- Dockerfile del frontend: se quitó la copia de `public/` (la carpeta no existe).
+- Dockerfile del frontend: se quitó la copia de `public/` porque la carpeta no existía; en la
+  ronda de interfaz volvió a añadirse al crear `public/ejemplo.csv`.
 - El comando de exportación del PNG de la especificación usa `-w 1600`, opción que ya no
   existe en la imagen actual de `mermaid-cli`; se usó `-s 2` (escala) y el PNG se generó con
   la imagen `minlag/mermaid-cli`.
@@ -123,8 +171,29 @@ Tras la revisión independiente, Claude Code aplicó estas correcciones (commits
 - Documentación: `NODE_ENV=development` en `backend/.env.example`, README en lenguaje de
   producto con las limitaciones actualizadas y este documento.
 
+Tras la revisión final (informe 13):
+
+- M1: el adaptador de Fastify itera `request.parts()`, de modo que dos archivos, archivo y
+  campo, o campo y archivo responden `400` a través del mapeo de límites del multipart, que
+  antes era código muerto (commit `d1ac1be`, tres pruebas de integración).
+
+Tras la revisión de la ronda de interfaz (informe 16):
+
+- La oración del README sobre los mensajes en inglés afirmaba que la interfaz solo los
+  muestra con códigos desconocidos; también los muestra como detalle de `MALFORMED_CSV`,
+  `ENQUEUE_FAILED` y `PROCESSING_ERROR`. Se corrigió el texto (commit `bdb2ce0`).
+
 ## Qué aprendí
-<!-- TODO (candidato): completar con tu experiencia real -->
+
+Que mi aporte está en decidir y verificar, no en teclear. Las afirmaciones que se dejaron
+pasar sin ejecutar el comando que las respalda fueron justamente las que fallaron después:
+una cifra de cobertura desactualizada en el README y una oración que no coincidía con el
+código. Por eso ninguna cifra ni afirmación de este repositorio se dio por buena sin volver a
+correrla. Aprendí también a leer el enunciado con desconfianza sana: tres contradicciones
+salieron de ahí, y resolverlas por escrito antes de codificar evitó rehacer capas. Y que una
+especificación revisada por alguien que no la escribió vale más que una especificación
+brillante: las violaciones de la regla de dependencias que encontró el verificador se
+habrían propagado a todo el proyecto.
 
 ## Limitaciones encontradas con IA
 
@@ -166,13 +235,21 @@ resolvieron:
 - La imagen `minlag/mermaid-cli` más reciente rechaza la opción `-w` del comando de la
   especificación; el diagrama de arquitectura en dirección `LR` salía demasiado ancho para
   leerse y se pasó a `TB`.
+- PostgreSQL rechaza `\u0000` dentro de `jsonb`; los valores de las filas con error se
+  guardan con los caracteres de control reemplazados por U+FFFD.
+- La API acepta un único origen (`http://localhost:3000`); abrir el frontend desde
+  `127.0.0.1:3000` falla por CORS.
 - Los hallazgos no bloqueantes de las revisiones automáticas que no se corrigieron están
   en el README, en "Limitaciones conocidas".
 - Hasta publicar el repositorio, el workflow de CI solo se validó con `actionlint` y
   reproduciendo cada job en local. La primera ejecución en GitHub (2026-10-10) fue verde en
-  los jobs `backend`, `frontend` y `e2e`, lo que confirmó las versiones `@v7` de las actions.
+  los jobs `backend`, `frontend` y `e2e`, lo que confirmó las versiones `@v7` de las actions;
+  las dos ejecuciones posteriores también lo fueron.
 
-### Lista de humo manual (ejecutada una vez, en la capa 10)
+### Lista de humo manual (ejecutada una vez por Claude Code, en la capa 10)
+
+Los pasos de las dos tablas siguientes los ejecutó Claude Code (línea de comandos y Chromium
+headless con `playwright-core`); yo revisé los resultados reportados y los informes.
 
 | Paso | Cómo se comprobó | Resultado |
 |------|------------------|-----------|
@@ -191,7 +268,7 @@ resolvieron:
 No se midió el criterio "el listado y el dashboard se refrescan en menos de 5 s" del paso 5b
 con un cronómetro; solo se comprobó que el polling del detalle ocurre cada 3 s.
 
-### Lista de aceptación previa a la entrega (ejecutada una vez, en la capa 10)
+### Lista de aceptación previa a la entrega (ejecutada una vez por Claude Code, en la capa 10)
 
 | Comprobación | Cómo se comprobó | Resultado |
 |--------------|------------------|-----------|
@@ -200,7 +277,7 @@ con un cronómetro; solo se comprobó que el polling del detalle ocurre cada 3 s
 | `sample-with-errors.csv` | Chromium headless | `Completado`, `failedRows 6`, tabla con las filas 3, 7, 11, 15, 19 y 23 |
 | `invalid-header.csv` | Chromium headless | `Fallido`, `Invalid CSV header: missing [date]` |
 | `docker compose --profile app up --build` en el clon | curl y Chromium headless | `/health` devuelve `{"status":"ok"}`, el frontend responde y el flujo completo (muestra, errores, cabecera inválida y archivo grande) funciona contra los contenedores |
-| CI verde en `main` e insignia | Ejecución de CI en GitHub | En la capa 10 no se pudo comprobar (sin remoto). Tras publicar, la primera ejecución (2026-10-10) fue verde: [ejecución 38084387707](https://github.com/atarico/csv-ingestion-pipeline/actions/runs/38084387707). |
+| CI verde en `main` e insignia | Ejecución de CI en GitHub | En la capa 10 no se pudo comprobar (sin remoto). Tras publicar, la primera ejecución (2026-10-10) fue verde: [ejecución 38084387707](https://github.com/atarico/csv-ingestion-pipeline/actions/runs/38084387707); después, [38101920761](https://github.com/atarico/csv-ingestion-pipeline/actions/runs/38101920761) y [38291158893](https://github.com/atarico/csv-ingestion-pipeline/actions/runs/38291158893) |
 | `git log` con commits convencionales y sin trailers de atribución; sin `.env` versionado | `git log`, `git ls-files` | Cumple |
 | `docs/arquitectura-aws.png`, `docs/arquitectura-aws.md`, `docs/flujo.md` | `stat`, lectura de la imagen y render de `flujo.md` con `mermaid-cli` | El PNG pesa 310 953 bytes (regenerado tras publicar) y se ve legible; ambos diagramas se renderizan |
 | `sample-data.csv` | `rg -c ""` | 61 líneas (cabecera y 60 filas) |
@@ -214,7 +291,17 @@ con un cronómetro; solo se comprobó que el polling del detalle ocurre cada 3 s
 - Limpieza compensatoria del objeto de S3 si falla la creación del registro.
 - Pruebas unitarias de los adaptadores de S3 y SQS (hoy solo las cubren las pruebas E2E).
 - Versión optimista en `Upload` y camino de operador para reprocesar uploads en `FAILED`.
+- Rechazar los bytes UTF-8 inválidos de una celda en lugar de guardarlos como U+FFFD, y
+  reportar los importes negativos como `NOT_POSITIVE` en lugar de `INVALID_NUMBER`.
+- Mover el foco a la tarjeta de archivo al confirmar el diálogo de subida, en vez de
+  devolverlo al botón ya deshabilitado.
 - Autenticación y multiusuario.
 
 ## Tiempo invertido
-<!-- TODO (candidato): completar -->
+
+Cuatro días de calendario, del 9 al 12 de octubre de 2026: lectura del enunciado y
+planificación el 9; implementación y primera revisión independiente el 10; correcciones,
+revisión final y publicación entre el 10 y el 11; ronda de interfaz, su revisión y la
+publicación final el 12. Las marcas de tiempo de `git log` miden el ritmo de los commits de
+los agentes, no las horas de lectura, revisión y decisión, que fueron la mayor parte de mi
+tiempo.

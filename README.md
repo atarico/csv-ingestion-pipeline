@@ -324,6 +324,18 @@ error" más abajo).
   UploadStatus`; `amount Float` pasa a `Decimal(14, 4)`; `date DateTime` pasa a `@db.Date`.
 - Se añadieron `Upload.rowErrors Json?`, `ActivityData.rowNumber Int` con
   `@@unique([uploadId, rowNumber])` e índices.
+- `GET /api/v1/uploads/:id/results` responde paginado (`page` y `limit`, por defecto 100 y
+  máximo 500) y cada fila incluye además `id` y `rowNumber`; el enunciado muestra un
+  `{ data: [...] }` sin paginar. Con archivos de 50 000 filas una sola respuesta no es
+  razonable, y la tabla del detalle pagina de a 100.
+- `CsvParserService.ts` no se creó: lo reemplazan el puerto `ICsvParser`, el adaptador
+  `CsvParseCsvParser` y la política `CsvHeaderPolicy`.
+- `postgres:18-alpine` en lugar de `postgres:15-alpine` (la versión con soporte actual; ver
+  en `USO-DE-IA.md` el ajuste de la ruta del volumen). La clave `version` de Compose se omite
+  porque Compose v2 la ignora.
+- No hay `backend/README.md` ni `frontend/README.md`: toda la documentación está en este
+  archivo. El frontend usa `next.config.ts` en lugar de `next.config.js`, y Tailwind 4 no
+  usa `tailwind.config.ts`: los tokens se declaran en CSS con `@theme`.
 
 ### Otras decisiones y trade-offs
 
@@ -634,8 +646,10 @@ escritorio.
 CI: el workflow `.github/workflows/ci.yml` define un job `backend` (generate, lint,
 typecheck, unitarias, integración con PostgreSQL, build), un job `frontend` (lint,
 typecheck, pruebas, build) y un job `e2e` (levanta el stack con Compose y ejecuta Playwright).
-La primera ejecución en GitHub Actions sobre `main` terminó en verde en los tres jobs:
-[ejecución 38084387707](https://github.com/atarico/csv-ingestion-pipeline/actions/runs/38084387707).
+Todas las ejecuciones en GitHub Actions sobre `main` han terminado en verde en los tres jobs,
+desde la primera, [38084387707](https://github.com/atarico/csv-ingestion-pipeline/actions/runs/38084387707),
+hasta la más reciente al escribir esto,
+[38291158893](https://github.com/atarico/csv-ingestion-pipeline/actions/runs/38291158893).
 
 ## Diagrama de infraestructura AWS
 
