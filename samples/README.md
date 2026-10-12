@@ -21,6 +21,7 @@ después de la cabecera).
 | `processedRows` | 19 |
 | `failedRows` | 6 |
 | `rowErrors` | 7 entradas (la fila 23 produce dos) |
+| Códigos (`rowErrors[].code`) | `INVALID_NUMBER` (filas 3 y 7), `INVALID_DATE` (fila 11) y `REQUIRED` (filas 15, 19 y las dos entradas de la 23) |
 
 | Fila de datos | Defecto | Campo del error |
 |---------------|---------|-----------------|
@@ -37,6 +38,7 @@ después de la cabecera).
 |-------|----------------|
 | Estado final | `FAILED` |
 | Mensaje | `Invalid CSV header: missing [date]` |
+| Código | `errorCode` `INVALID_HEADER`, con `errorDetails.missing` = `["date"]` |
 | Contenido | cabecera `category,amount,unit` (sin `date`) y 3 filas |
 
 ## `large-sample.csv` (se genera, no se versiona)

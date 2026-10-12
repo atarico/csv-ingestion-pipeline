@@ -28,6 +28,13 @@ orquestación evaluaba el riesgo de cada commit y, cuando un grupo de commits er
 alto o sumaba unas 400 líneas, ejecutaba una revisión de código automática con mi
 consentimiento (en la ronda de correcciones acepté todas las revisiones propuestas). Sus hallazgos
 no bloqueantes que no se corrigieron están en el README, en "Limitaciones conocidas".
+
+Después, en una ronda de interfaz, pedí cuatro cosas: aplicar la marca de CarbonBox,
+añadir un tema claro y oscuro, mejorar la respuesta al subir un archivo y hacer que los
+errores digan qué corregir. Escribí la especificación (`12-ux-brand`) en una sesión de
+planificación y Claude Code la ejecutó tarea por tarea, con las pruebas primero, un
+sub-agente escritor por tarea y una revisión automática por cada grupo de commits, con mi
+consentimiento (acepté todas). Revisé visualmente las capturas de pantalla de cada paso.
 Además de este documento, recibí un informe didáctico por capa (fuera del repositorio).
 
 En la tercera fase pedí una revisión independiente del resultado, hecha con cuatro
