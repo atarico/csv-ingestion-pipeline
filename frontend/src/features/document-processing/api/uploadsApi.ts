@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import { getOutcome, type OutcomeKey, type UploadListFilter } from '../lib/outcomes';
 import { getPollingInterval } from '../lib/polling';
 import { uploadsClient } from './uploadsClient';
 
@@ -10,6 +11,7 @@ export const uploadKeys = {
   all: ['uploads'] as const,
   lists: () => [...uploadKeys.all, 'list'] as const,
   list: (page: number) => [...uploadKeys.lists(), { page }] as const,
+  recent: (filter: UploadListFilter) => [...uploadKeys.lists(), 'recent', filter] as const,
   details: () => [...uploadKeys.all, 'detail'] as const,
   detail: (id: string) => [...uploadKeys.details(), id] as const,
   results: (id: string, page: number) => [...uploadKeys.detail(id), 'results', { page }] as const,
@@ -17,6 +19,7 @@ export const uploadKeys = {
 };
 
 const LIST_REFRESH_MS = 5000;
+const RECENT_LIMIT = 10;
 
 /** sessionStorage key read by the detail page to show the "uploaded" banner once. */
 export const JUST_UPLOADED_KEY = 'carbonbox:just-uploaded';
@@ -27,6 +30,19 @@ export function useUploads(page: number) {
     queryFn: () => uploadsClient.list(page),
     refetchInterval: LIST_REFRESH_MS,
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Latest uploads of one dashboard outcome. Deliberately no `keepPreviousData`: switching outcome
+ * must show a skeleton, never another outcome's rows.
+ */
+export function useRecentUploads(outcomeKey: OutcomeKey) {
+  const { filter } = getOutcome(outcomeKey);
+  return useQuery({
+    queryKey: uploadKeys.recent(filter),
+    queryFn: () => uploadsClient.list(1, { limit: RECENT_LIMIT, ...filter }),
+    refetchInterval: LIST_REFRESH_MS,
   });
 }
 

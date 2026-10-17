@@ -7,6 +7,11 @@ import type {
   UploadStatsDto,
   UploadSummaryDto,
 } from '../types/upload.types';
+import type { UploadListFilter } from '../lib/outcomes';
+
+export interface ListUploadsOptions extends UploadListFilter {
+  limit?: number;
+}
 
 export const uploadsClient = {
   async create(file: File, onProgress?: (percent: number) => void): Promise<CreateUploadResult> {
@@ -23,8 +28,12 @@ export const uploadsClient = {
     return response.data;
   },
 
-  async list(page: number, limit = 10): Promise<PaginatedDto<UploadSummaryDto>> {
-    const response = await apiClient.get<PaginatedDto<UploadSummaryDto>>('/uploads', { params: { page, limit } });
+  async list(page: number, options: ListUploadsOptions = {}): Promise<PaginatedDto<UploadSummaryDto>> {
+    const { limit = 10, status, hasRowErrors } = options;
+    // Axios drops undefined params, so unfiltered calls keep the exact previous query string.
+    const response = await apiClient.get<PaginatedDto<UploadSummaryDto>>('/uploads', {
+      params: { page, limit, status, hasRowErrors },
+    });
     return response.data;
   },
 

@@ -27,3 +27,22 @@ export function formatBytes(bytes: number): string {
   }
   return `${sizeFormat.format(value)} ${SIZE_UNITS[unit]}`;
 }
+
+const relativeFormat = new Intl.RelativeTimeFormat('es', { numeric: 'auto' });
+
+const RELATIVE_UNITS: Array<{ unit: Intl.RelativeTimeFormatUnit; seconds: number }> = [
+  { unit: 'year', seconds: 365 * 24 * 3600 },
+  { unit: 'month', seconds: 30 * 24 * 3600 },
+  { unit: 'day', seconds: 24 * 3600 },
+  { unit: 'hour', seconds: 3600 },
+  { unit: 'minute', seconds: 60 },
+];
+
+/** Spanish relative time ("hace 5 minutos", "ayer"). Anything under a minute, or in the future, is "ahora". */
+export function formatRelativeTime(iso: string, now: Date = new Date()): string {
+  const elapsedSeconds = Math.floor((now.getTime() - new Date(iso).getTime()) / 1000);
+  for (const { unit, seconds } of RELATIVE_UNITS) {
+    if (elapsedSeconds >= seconds) return relativeFormat.format(-Math.floor(elapsedSeconds / seconds), unit);
+  }
+  return relativeFormat.format(0, 'second');
+}

@@ -87,3 +87,39 @@ export function XIcon({ className }: IconProps) {
     </Icon>
   );
 }
+
+export function LayersIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="m12 3 9 5-9 5-9-5z" />
+      <path d="m3 13 9 5 9-5" />
+    </Icon>
+  );
+}
+
+export function XCircleIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m9 9 6 6" />
+      <path d="m15 9-6 6" />
+    </Icon>
+  );
+}
+
+export function ChevronRightIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="m9 6 6 6-6 6" />
+    </Icon>
+  );
+}
+
+export function InboxIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M3 13h5l1.5 3h5L16 13h5" />
+      <path d="M5.5 5h13L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5z" />
+    </Icon>
+  );
+}
