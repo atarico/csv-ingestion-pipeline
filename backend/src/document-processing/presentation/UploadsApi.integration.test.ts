@@ -415,6 +415,76 @@ describe('Uploads REST API', () => {
       processing: 0,
       completed: 0,
       failed: 1,
+      completedWithRowErrors: 0,
+    });
+  });
+
+  describe('GET /uploads outcome filters', () => {
+    async function seedOutcomes(): Promise<void> {
+      const clean = await seedUpload(uploads, 'clean.csv');
+      clean.startProcessing(2);
+      clean.complete({ processedRows: 2, failedRows: 0, rowErrors: [] });
+      await uploads.save(clean);
+      const withErrors = await seedUpload(uploads, 'errors.csv');
+      withErrors.startProcessing(3);
+      withErrors.complete({
+        processedRows: 2,
+        failedRows: 1,
+        rowErrors: [{ row: 2, field: 'amount', code: 'INVALID_NUMBER', message: 'bad' }],
+      });
+      await uploads.save(withErrors);
+      const failed = await seedUpload(uploads, 'failed.csv');
+      failed.fail({ code: 'PROCESSING_ERROR', message: 'boom' });
+      await uploads.save(failed);
+    }
+
+    async function listNames(query: string): Promise<{ names: string[]; total: number }> {
+      const response = await ctx.app.inject({ method: 'GET', url: `${API}/uploads?${query}` });
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ data: Array<{ fileName: string }>; total: number }>();
+      return { names: body.data.map((item) => item.fileName).sort(), total: body.total };
+    }
+
+    it('status=COMPLETED&hasRowErrors=true returns only completed uploads with failed rows', async () => {
+      await seedOutcomes();
+
+      expect(await listNames('status=COMPLETED&hasRowErrors=true')).toEqual({
+        names: ['errors.csv'],
+        total: 1,
+      });
+    });
+
+    it('status=COMPLETED&hasRowErrors=false returns the clean completed uploads', async () => {
+      await seedOutcomes();
+
+      expect(await listNames('status=COMPLETED&hasRowErrors=false')).toEqual({
+        names: ['clean.csv'],
+        total: 1,
+      });
+    });
+
+    it('status=FAILED returns only failed uploads', async () => {
+      await seedOutcomes();
+
+      expect(await listNames('status=FAILED')).toEqual({ names: ['failed.csv'], total: 1 });
+    });
+
+    it.each(['status=DONE', 'hasRowErrors=yes', 'hasRowErrors=1'])(
+      '%s returns 400',
+      async (query) => {
+        const response = await ctx.app.inject({ method: 'GET', url: `${API}/uploads?${query}` });
+
+        expect(response.statusCode).toBe(400);
+        expect(response.json<{ error: { code: string } }>().error.code).toBe('VALIDATION_ERROR');
+      },
+    );
+
+    it('stats reports completedWithRowErrors', async () => {
+      await seedOutcomes();
+
+      const response = await ctx.app.inject({ method: 'GET', url: `${API}/uploads/stats` });
+
+      expect(response.json()).toMatchObject({ completed: 2, completedWithRowErrors: 1 });
     });
   });
 

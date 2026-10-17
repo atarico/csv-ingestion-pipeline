@@ -25,6 +25,10 @@ export class ListUploadsController extends BaseController {
       userId: this.defaultUserId,
       page: query.data.page,
       limit: query.data.limit,
+      filter: {
+        ...(query.data.status !== undefined && { status: query.data.status }),
+        ...(query.data.hasRowErrors !== undefined && { hasRowErrors: query.data.hasRowErrors }),
+      },
     });
     return result.isLeft() ? this.fail(result.value, request.requestId) : this.ok(result.value);
   }

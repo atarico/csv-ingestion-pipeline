@@ -23,6 +23,6 @@ export interface ActivityDataDto { id: string; rowNumber: number; category: stri
 
 export interface PaginatedDto<T> { data: T[]; total: number; page: number; limit: number; totalPages: number }
 
-export interface UploadStatsDto { total: number; pending: number; processing: number; completed: number; failed: number }
+export interface UploadStatsDto { total: number; pending: number; processing: number; completed: number; failed: number; completedWithRowErrors: number }
 
 export interface ApiErrorBody { error: { code: string; message: string; details?: unknown }; requestId: string }

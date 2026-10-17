@@ -552,10 +552,14 @@ curl -s http://localhost:4000/api/v1/uploads/<id>
 # Listado paginado
 curl -s "http://localhost:4000/api/v1/uploads?page=1&limit=10"
 
+# Listado filtrado por resultado (status y hasRowErrors son opcionales y combinables;
+# hasRowErrors=true es failedRows > 0, hasRowErrors=false es failedRows 0 o desconocido)
+curl -s "http://localhost:4000/api/v1/uploads?status=COMPLETED&hasRowErrors=true&limit=10"
+
 # Filas procesadas (limit por defecto 100, máximo 500)
 curl -s "http://localhost:4000/api/v1/uploads/<id>/results?page=1&limit=100"
 
-# Totales por estado (dashboard)
+# Totales por estado (dashboard); completedWithRowErrors cuenta los COMPLETED con filas fallidas
 curl -s http://localhost:4000/api/v1/uploads/stats
 
 # Salud

@@ -66,4 +66,6 @@ export interface UploadStatsDto {
   processing: number;
   completed: number;
   failed: number;
+  /** COMPLETED uploads with at least one failed row; a subset of `completed`. */
+  completedWithRowErrors: number;
 }
