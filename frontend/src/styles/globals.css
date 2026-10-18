@@ -76,6 +76,8 @@
   --shadow-btn-accent: 0 8px 22px -10px rgb(47 107 74 / 0.6);
   --ease-brand: cubic-bezier(0.3, 0.7, 0.4, 1);
   --animate-card-in: card-in 220ms var(--ease-brand) both;
+  --animate-row-rise: row-rise 260ms var(--ease-brand) both;
+  --animate-shimmer: shimmer 1.4s linear infinite;
 
   @keyframes card-in {
     from {
@@ -87,6 +89,33 @@
       transform: none;
     }
   }
+
+  @keyframes row-rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+}
+
+/* Loading placeholder: token-driven sweep, static under reduced motion (see motion-safe at call sites). */
+@utility skeleton {
+  background-image: linear-gradient(90deg, var(--color-line) 0%, var(--color-primary-soft) 50%, var(--color-line) 100%);
+  background-size: 200% 100%;
+  border-radius: 6px;
 }
 
 body {
