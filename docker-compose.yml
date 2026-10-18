@@ -7,7 +7,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      # Host port is overridable (POSTGRES_PORT) when 5432 is already taken; services inside
+      # Compose keep using postgres:5432.
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       # postgres 18+ images require the mount at /var/lib/postgresql (not /data);
       # a mount at /var/lib/postgresql/data makes the container exit at startup.

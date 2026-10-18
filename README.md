@@ -75,6 +75,18 @@ docker compose --profile app rm -f api worker frontend migrate
 `docker compose --profile app down` detiene y elimina también PostgreSQL y LocalStack
 (los volúmenes se conservan).
 
+Si el puerto 5432 ya está ocupado (por ejemplo, otro PostgreSQL local), Compose falla con
+`Bind for ...:5432 failed: port is already allocated`. Se puede publicar PostgreSQL en otro
+puerto del host con `POSTGRES_PORT`:
+
+```bash
+POSTGRES_PORT=5440 docker compose --profile app up --build
+```
+
+Los servicios dentro de Compose siguen usando `postgres:5432`, así que la opción B no
+necesita más cambios. En la opción A (API, worker o tests de integración en el host), hay
+que apuntar `DATABASE_URL` a ese puerto (`localhost:5440`).
+
 `NEXT_PUBLIC_API_URL` se incrusta en el frontend en tiempo de build y apunta a
 `http://localhost:4000/api/v1`, porque es el navegador (en el host) quien llama a la API. Como queda fijado en la imagen,
 cambiarla exige reconstruirla (`--build`, o `--build-arg NEXT_PUBLIC_API_URL=...`); reiniciar
