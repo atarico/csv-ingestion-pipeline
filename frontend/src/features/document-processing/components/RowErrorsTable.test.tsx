@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { RowErrorDto } from '../types/upload.types';
 import { RowErrorsTable } from './RowErrorsTable';
@@ -27,7 +28,7 @@ describe('RowErrorsTable', () => {
     render(<RowErrorsTable errors={errors} failedRows={3} />);
 
     const row = bodyRow(1);
-    expect(within(row).getByRole('cell', { name: '3' })).toBeInTheDocument();
+    expect(within(row).getAllByRole('cell')[0]).toHaveTextContent(/^3/);
     expect(within(row).getByRole('cell', { name: 'amount' })).toBeInTheDocument();
     const value = within(row).getByRole('cell', { name: '-12.5' });
     expect(value).toHaveClass('font-mono');
@@ -54,5 +55,61 @@ describe('RowErrorsTable', () => {
     render(<RowErrorsTable errors={errors} failedRows={250} />);
     expect(screen.getByText('Se muestran los primeros 3 errores de 250.')).toBeInTheDocument();
     expect(screen.getByText('La fila 1 es la primera después de la cabecera.')).toBeInTheDocument();
+  });
+
+  it('offers a chip per field with its count and filters client-side', async () => {
+    render(<RowErrorsTable errors={errors} failedRows={3} />);
+
+    const group = screen.getByRole('group', { name: 'Filtrar por columna' });
+    expect(within(group).getByRole('button', { name: 'Todas 3' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(group).getByRole('button', { name: 'amount 1' })).toBeInTheDocument();
+    expect(within(group).getByRole('button', { name: 'unit 1' })).toBeInTheDocument();
+    expect(within(group).getByRole('button', { name: 'Sin columna 1' })).toBeInTheDocument();
+
+    await userEvent.click(within(group).getByRole('button', { name: 'unit 1' }));
+
+    expect(screen.getAllByRole('row')).toHaveLength(2);
+    expect(bodyRow(1)).toHaveTextContent('La celda está vacía');
+    expect(within(group).getByRole('button', { name: 'unit 1' })).toHaveAttribute('aria-pressed', 'true');
+
+    await userEvent.click(within(group).getByRole('button', { name: 'Todas 3' }));
+    expect(screen.getAllByRole('row')).toHaveLength(4);
+  });
+
+  it('falls back to every error when the selected field disappears from the list', async () => {
+    const { rerender } = render(<RowErrorsTable errors={errors} failedRows={3} />);
+    const group = screen.getByRole('group', { name: 'Filtrar por columna' });
+    await userEvent.click(within(group).getByRole('button', { name: 'unit 1' }));
+
+    const withoutUnit = errors.filter((error) => error.field !== 'unit');
+    rerender(<RowErrorsTable errors={withoutUnit} failedRows={2} />);
+
+    expect(screen.getAllByRole('row')).toHaveLength(3);
+    expect(screen.getByRole('button', { name: 'Todas 2' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('hides the chips when every error is in the same field', () => {
+    render(<RowErrorsTable errors={[errors[0] as RowErrorDto]} failedRows={1} />);
+    expect(screen.queryByRole('group', { name: 'Filtrar por columna' })).not.toBeInTheDocument();
+  });
+
+  it('paginates 25 errors per page', async () => {
+    const many: RowErrorDto[] = Array.from({ length: 30 }, (_, index) => ({
+      row: index + 1,
+      field: 'amount',
+      code: 'INVALID_NUMBER',
+      message: 'bad',
+      value: `v${index + 1}`,
+    }));
+    render(<RowErrorsTable errors={many} failedRows={30} />);
+
+    expect(screen.getAllByRole('row')).toHaveLength(26);
+    expect(screen.getByText('Página 1 de 2')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+
+    expect(screen.getAllByRole('row')).toHaveLength(6);
+    expect(screen.getByText('Página 2 de 2')).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'v30' })).toBeInTheDocument();
   });
 });

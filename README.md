@@ -297,6 +297,17 @@ actualiza sola." Se muestra una sola vez por subida (una marca en `sessionStorag
 español qué ocurrió y cómo corregirlo a partir de los códigos de la API (ver "Códigos de
 error" más abajo).
 
+**Interfaz web.** El inicio es un panel con cuatro tarjetas de resultado (Total, Correctos, Con
+problemas y Fallidos, donde "con problemas" es un upload completado con filas rechazadas) y un
+indicador de uploads en proceso. Cada tarjeta es una pestaña: al elegirla se muestran debajo los
+10 últimos uploads de ese resultado. La lista de uploads se puede filtrar por el mismo resultado
+(`/uploads?outcome=`), con paginación y una barra de salud de filas por upload. El detalle de un
+upload muestra un resumen (filas totales, válidas, con errores y porcentaje de válidas) y dos
+pestañas, "Datos procesados" y "Filas con errores", esta última solo si hay filas rechazadas y
+abierta por defecto; permite filtrar los errores por columna y los pagina de 25 en 25. Todo
+funciona con teclado (flechas, Inicio y Fin cambian de pestaña) y respeta
+`prefers-reduced-motion`.
+
 ## Decisiones técnicas
 
 ### Decisiones ante ambigüedades del enunciado

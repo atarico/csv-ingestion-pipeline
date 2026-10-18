@@ -3,16 +3,16 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { CheckCircleIcon, XIcon } from '@/shared/components/icons';
+import { CheckCircleIcon, ChevronLeftIcon, XCircleIcon, XIcon } from '@/shared/components/icons';
 import { LoadingSpinner } from '@/shared/components/LoadingSpinner';
 import { getApiErrorMessage } from '@/shared/lib/api-client';
-import { formatDateTime } from '@/shared/lib/format';
 import { describeUploadFailure } from '../lib/describeErrors';
 import { JUST_UPLOADED_KEY, useUpload, useUploadResults } from '../api/uploadsApi';
-import { ProcessingStatus } from './ProcessingStatus';
 import { ResultsTable } from './ResultsTable';
-import type { UploadDto } from '../types/upload.types';
+import type { RowErrorDto, UploadDto } from '../types/upload.types';
 import { RowErrorsTable } from './RowErrorsTable';
+import { UploadDetailSummary } from './UploadDetailSummary';
+import { UploadDetailTabs, type DetailTab, type DetailTabKey } from './UploadDetailTabs';
 
 export function UploadDetail({ id }: { id: string }) {
   const [page, setPage] = useState(1);
@@ -38,6 +38,7 @@ export function UploadDetail({ id }: { id: string }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Detalle del upload</h1>
         <Button href="/uploads" variant="secondary">
+          <ChevronLeftIcon className="h-4 w-4" />
           Volver a la lista
         </Button>
       </div>
@@ -67,66 +68,17 @@ export function UploadDetail({ id }: { id: string }) {
 
       {upload ? (
         <>
-          <dl className="grid gap-4 rounded-card border border-line bg-surface p-5 shadow-card sm:grid-cols-2">
-            <div>
-              <dt className="text-sm text-ink-muted">Archivo</dt>
-              <dd className="break-all font-medium text-ink">{upload.fileName}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-ink-muted">Estado</dt>
-              <dd className="mt-0.5">
-                <ProcessingStatus upload={upload} />
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-ink-muted">Fecha de subida</dt>
-              <dd className="tabular-nums text-ink">{formatDateTime(upload.createdAt)}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-ink-muted">Última actualización</dt>
-              <dd className="tabular-nums text-ink">{formatDateTime(upload.updatedAt)}</dd>
-            </div>
-          </dl>
+          <UploadDetailSummary upload={upload} />
 
           {upload.status === 'COMPLETED' ? (
-            <>
-              <p className="text-ink">
-                Filas procesadas: {upload.processedRows ?? 0} · Filas con errores: {upload.failedRows ?? 0}
-              </p>
-
-              <div className="space-y-3">
-                <h2 className="text-xl font-bold tracking-tight text-primary">Datos procesados</h2>
-                {results.isPending ? <LoadingSpinner /> : null}
-                {results.isError ? (
-                  <ErrorAlert message={getApiErrorMessage(results.error)} onRetry={() => void results.refetch()} />
-                ) : null}
-                {results.data ? (
-                  <ResultsTable
-                    rows={results.data.data}
-                    page={results.data.page}
-                    totalPages={results.data.totalPages}
-                    onPageChange={setPage}
-                  />
-                ) : null}
-              </div>
-
-              {(upload.failedRows ?? 0) > 0 ? (
-                <div className="space-y-3">
-                  <h2 className="text-xl font-bold tracking-tight text-primary">Filas con errores</h2>
-                  <RowErrorsTable errors={upload.rowErrors} failedRows={upload.failedRows ?? 0} />
-                </div>
-              ) : null}
-            </>
+            <CompletedContent upload={upload} results={results} onPageChange={setPage} />
           ) : null}
 
           {upload.status === 'FAILED' ? (
             <>
-              <FailureAlert upload={upload} />
+              <FailureCallout upload={upload} />
               {upload.rowErrors.length > 0 ? (
-                <div className="space-y-3">
-                  <h2 className="text-xl font-bold tracking-tight text-primary">Filas con errores</h2>
-                  <RowErrorsTable errors={upload.rowErrors} failedRows={upload.failedRows ?? upload.rowErrors.length} />
-                </div>
+                <ErrorsPanel errors={upload.rowErrors} failedRows={upload.failedRows ?? upload.rowErrors.length} />
               ) : null}
             </>
           ) : null}
@@ -136,26 +88,93 @@ export function UploadDetail({ id }: { id: string }) {
   );
 }
 
-function FailureAlert({ upload }: { upload: UploadDto }) {
+function PanelHeading({ children }: { children: string }) {
+  return <h2 className="text-lg font-semibold tracking-tight text-primary">{children}</h2>;
+}
+
+function ErrorsPanel({ errors, failedRows }: { errors: RowErrorDto[]; failedRows: number }) {
+  return (
+    <div className="space-y-3">
+      <PanelHeading>Filas con errores</PanelHeading>
+      <RowErrorsTable errors={errors} failedRows={failedRows} />
+    </div>
+  );
+}
+
+interface CompletedContentProps {
+  upload: UploadDto;
+  results: ReturnType<typeof useUploadResults>;
+  onPageChange: (page: number) => void;
+}
+
+function CompletedContent({ upload, results, onPageChange }: CompletedContentProps) {
+  const failedRows = upload.failedRows ?? 0;
+  const hasErrors = failedRows > 0;
+  const [chosen, setChosen] = useState<DetailTabKey | null>(null);
+  // Errors are the actionable content, so they open first; the user's pick wins afterwards.
+  const selected: DetailTabKey = hasErrors ? (chosen ?? 'errors') : 'data';
+
+  const dataPanel = (
+    <div className="space-y-3">
+      <PanelHeading>Datos procesados</PanelHeading>
+      {results.isPending ? <LoadingSpinner /> : null}
+      {results.isError ? <ErrorAlert message={getApiErrorMessage(results.error)} onRetry={() => void results.refetch()} /> : null}
+      {results.data ? (
+        <ResultsTable
+          rows={results.data.data}
+          page={results.data.page}
+          totalPages={results.data.totalPages}
+          onPageChange={onPageChange}
+        />
+      ) : null}
+    </div>
+  );
+
+  if (!hasErrors) return dataPanel;
+
+  const tabs: DetailTab[] = [
+    { key: 'data', label: 'Datos procesados', count: upload.processedRows ?? 0, tone: 'accent' },
+    { key: 'errors', label: 'Filas con errores', count: failedRows, tone: 'danger' },
+  ];
+
+  return (
+    <UploadDetailTabs tabs={tabs} selected={selected} onSelect={setChosen}>
+      {selected === 'errors' ? <ErrorsPanel errors={upload.rowErrors} failedRows={failedRows} /> : dataPanel}
+    </UploadDetailTabs>
+  );
+}
+
+function FailureCallout({ upload }: { upload: UploadDto }) {
   const { title, where, lines, fix, sampleLink } = describeUploadFailure(upload);
   return (
-    <ErrorAlert title={title}>
-      <div className="mt-1 space-y-2 text-sm">
-        {where ? <p className="font-medium">Dónde: {where}</p> : null}
+    <div
+      role="alert"
+      className="flex gap-4 rounded-card border border-danger/30 border-l-4 border-l-danger bg-danger-soft p-5 text-danger shadow-card motion-safe:animate-card-in"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface/70">
+        <XCircleIcon className="h-5 w-5" />
+      </span>
+      <div className="min-w-0 flex-1 space-y-2">
+        <p className="text-lg font-semibold leading-snug">{title}</p>
+        {where ? <p className="text-sm font-medium">Dónde: {where}</p> : null}
         {lines.length > 0 ? (
-          <ul className="list-inside list-disc">
+          <ul className="list-inside list-disc text-sm">
             {lines.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
         ) : null}
-        {fix ? <p>{fix}</p> : null}
+        {fix ? <p className="text-sm">{fix}</p> : null}
         {sampleLink ? (
-          <a href="/ejemplo.csv" download className="inline-block font-semibold underline underline-offset-2">
+          <a
+            href="/ejemplo.csv"
+            download
+            className="inline-block rounded-full border border-danger/40 bg-surface/70 px-4 py-1.5 text-sm font-semibold underline-offset-2 transition-colors duration-150 hover:bg-surface focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/40 motion-reduce:transition-none"
+          >
             Descargar un CSV de ejemplo
           </a>
         ) : null}
       </div>
-    </ErrorAlert>
+    </div>
   );
 }
