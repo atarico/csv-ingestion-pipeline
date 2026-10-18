@@ -12,13 +12,17 @@ export class GetUploadStatsQueryHandler implements IQueryHandler<
   constructor(private readonly uploadRepository: IUploadRepository) {}
 
   async execute(query: GetUploadStatsQuery): Promise<Either<DomainError, UploadStatsDto>> {
-    const counts = await this.uploadRepository.countByStatus(query.userId);
+    const [counts, completedWithRowErrors] = await Promise.all([
+      this.uploadRepository.countByStatus(query.userId),
+      this.uploadRepository.countCompletedWithRowErrors(query.userId),
+    ]);
     return Either.right({
       total: counts.PENDING + counts.PROCESSING + counts.COMPLETED + counts.FAILED,
       pending: counts.PENDING,
       processing: counts.PROCESSING,
       completed: counts.COMPLETED,
       failed: counts.FAILED,
+      completedWithRowErrors,
     });
   }
 }

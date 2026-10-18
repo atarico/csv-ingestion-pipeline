@@ -13,7 +13,14 @@ import { ListUploadsQueryHandler } from './ListUploadsQueryHandler.js';
 
 const USER = 'user-123';
 
-function buildUpload(options: { userId?: string; status?: UploadStatus; createdAt?: Date } = {}) {
+function buildUpload(
+  options: {
+    userId?: string;
+    status?: UploadStatus;
+    createdAt?: Date;
+    failedRows?: number | null;
+  } = {},
+) {
   const fileName = FileName.create('data.csv');
   if (fileName.isLeft()) throw fileName.value;
   const created = Upload.create({ fileName: fileName.value, userId: options.userId ?? USER });
@@ -25,7 +32,7 @@ function buildUpload(options: { userId?: string; status?: UploadStatus; createdA
     userId: options.userId ?? USER,
     totalRows: null,
     processedRows: null,
-    failedRows: null,
+    failedRows: options.failedRows ?? null,
     errorMessage: null,
     errorCode: null,
     errorDetails: null,
@@ -129,6 +136,28 @@ describe('query handlers', () => {
     });
   });
 
+  describe('ListUploads filters', () => {
+    it('passes the filter to the repository and totals the filtered set', async () => {
+      const clean = buildUpload({ status: UploadStatus.COMPLETED, failedRows: 0 });
+      const withErrors = buildUpload({ status: UploadStatus.COMPLETED, failedRows: 2 });
+      const failed = buildUpload({ status: UploadStatus.FAILED });
+      for (const upload of [clean, withErrors, failed]) await uploadRepository.save(upload);
+      const handler = new ListUploadsQueryHandler(uploadRepository);
+
+      const result = await handler.execute({
+        userId: USER,
+        page: 1,
+        limit: 10,
+        filter: { status: 'COMPLETED', hasRowErrors: true },
+      });
+
+      expect(result.isRight()).toBe(true);
+      if (!result.isRight()) return;
+      expect(result.value.data.map((item) => item.id)).toEqual([withErrors.id]);
+      expect(result.value).toMatchObject({ total: 1, totalPages: 1 });
+    });
+  });
+
   describe('GetUploadResults', () => {
     it('paginates by rowNumber and checks ownership', async () => {
       const upload = buildUpload({ status: UploadStatus.COMPLETED });
@@ -188,6 +217,7 @@ describe('query handlers', () => {
         UploadStatus.FAILED,
       ];
       for (const status of statuses) await uploadRepository.save(buildUpload({ status }));
+      await uploadRepository.save(buildUpload({ status: UploadStatus.COMPLETED, failedRows: 4 }));
       await uploadRepository.save(buildUpload({ userId: 'someone-else' }));
 
       const result = await new GetUploadStatsQueryHandler(uploadRepository).execute({
@@ -195,11 +225,12 @@ describe('query handlers', () => {
       });
 
       expect(result.value).toEqual({
-        total: 7,
+        total: 8,
         pending: 2,
         processing: 1,
-        completed: 3,
+        completed: 4,
         failed: 1,
+        completedWithRowErrors: 1,
       });
     });
   });

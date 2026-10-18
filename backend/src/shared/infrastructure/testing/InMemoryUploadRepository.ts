@@ -2,12 +2,22 @@ import type { PaginatedResult, PaginationParams } from '../../domain/Pagination.
 import { Upload } from '../../../document-processing/domain/entities/Upload.js';
 import type {
   IUploadRepository,
+  UploadListFilter,
   UploadStatusCounts,
 } from '../../../document-processing/domain/repositories/IUploadRepository.js';
 import type { UploadStatusValue } from '../../../document-processing/domain/value-objects/UploadStatus.js';
 
 function copyOf(upload: Upload): Upload {
   return Upload.reconstitute(upload.id, upload.toProps());
+}
+
+function matchesFilter(upload: Upload, filter: UploadListFilter): boolean {
+  if (filter.status !== undefined && upload.status.value !== filter.status) return false;
+  if (filter.hasRowErrors !== undefined) {
+    // Mirrors the SQL filter: unknown (null) failed rows count as no row errors.
+    if ((upload.failedRows ?? 0) > 0 !== filter.hasRowErrors) return false;
+  }
+  return true;
 }
 
 export class InMemoryUploadRepository implements IUploadRepository {
@@ -37,9 +47,13 @@ export class InMemoryUploadRepository implements IUploadRepository {
     return Promise.resolve(stored ? copyOf(stored) : null);
   }
 
-  findByUser(userId: string, pagination: PaginationParams): Promise<PaginatedResult<Upload>> {
+  findByUser(
+    userId: string,
+    pagination: PaginationParams,
+    filter: UploadListFilter = {},
+  ): Promise<PaginatedResult<Upload>> {
     const owned = [...this.uploads.values()]
-      .filter((upload) => upload.userId === userId)
+      .filter((upload) => upload.userId === userId && matchesFilter(upload, filter))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id));
     const start = (pagination.page - 1) * pagination.limit;
     return Promise.resolve({
@@ -56,5 +70,18 @@ export class InMemoryUploadRepository implements IUploadRepository {
       if (upload.userId === userId) counts[upload.status.value] += 1;
     }
     return Promise.resolve(counts);
+  }
+
+  countCompletedWithRowErrors(userId: string): Promise<number> {
+    let count = 0;
+    for (const upload of this.uploads.values()) {
+      if (
+        upload.userId === userId &&
+        matchesFilter(upload, { status: 'COMPLETED', hasRowErrors: true })
+      ) {
+        count += 1;
+      }
+    }
+    return Promise.resolve(count);
   }
 }

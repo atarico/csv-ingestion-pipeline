@@ -17,7 +17,11 @@ export class ListUploadsQueryHandler implements IQueryHandler<
     query: ListUploadsQuery,
   ): Promise<Either<DomainError, PaginatedDto<UploadSummaryDto>>> {
     const { page, limit } = query;
-    const result = await this.uploadRepository.findByUser(query.userId, { page, limit });
+    const result = await this.uploadRepository.findByUser(
+      query.userId,
+      { page, limit },
+      query.filter,
+    );
     return Either.right({
       data: result.items.map((upload) => UploadDtoMapper.toSummary(upload)),
       total: result.total,

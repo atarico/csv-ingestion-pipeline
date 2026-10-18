@@ -132,6 +132,83 @@ describe('Prisma repositories', () => {
       expect(page2.items[1]?.createdAt).toEqual(new Date(Date.UTC(2024, 0, 1)));
     });
 
+    describe('outcome filters', () => {
+      async function seedOutcomes() {
+        const clean = newUpload();
+        clean.startProcessing(2);
+        clean.complete({ processedRows: 2, failedRows: 0, rowErrors: [] });
+        const withErrors = newUpload();
+        withErrors.startProcessing(3);
+        withErrors.complete({
+          processedRows: 2,
+          failedRows: 1,
+          rowErrors: [{ row: 2, field: 'amount', code: 'INVALID_NUMBER', message: 'bad' }],
+        });
+        const failed = newUpload();
+        failed.fail({ code: 'PROCESSING_ERROR', message: 'boom' });
+        const pending = newUpload();
+        const foreign = newUpload('someone-else');
+        foreign.startProcessing(1);
+        foreign.complete({
+          processedRows: 1,
+          failedRows: 1,
+          rowErrors: [{ row: 2, field: 'amount', code: 'INVALID_NUMBER', message: 'bad' }],
+        });
+        for (const upload of [clean, withErrors, failed, pending, foreign]) {
+          await uploads.save(upload);
+        }
+        return { clean, withErrors, failed, pending };
+      }
+
+      it('filters by status with the filtered total', async () => {
+        const { failed } = await seedOutcomes();
+
+        const result = await uploads.findByUser(
+          USER_ID,
+          { page: 1, limit: 10 },
+          { status: 'FAILED' },
+        );
+
+        expect(result.items.map((u) => u.id)).toEqual([failed.id]);
+        expect(result.total).toBe(1);
+      });
+
+      it('hasRowErrors=true returns only uploads with failed rows', async () => {
+        const { withErrors } = await seedOutcomes();
+
+        const result = await uploads.findByUser(
+          USER_ID,
+          { page: 1, limit: 10 },
+          { status: 'COMPLETED', hasRowErrors: true },
+        );
+
+        expect(result.items.map((u) => u.id)).toEqual([withErrors.id]);
+        expect(result.total).toBe(1);
+      });
+
+      it('hasRowErrors=false includes zero and null failed rows', async () => {
+        const { clean, failed, pending } = await seedOutcomes();
+
+        const result = await uploads.findByUser(
+          USER_ID,
+          { page: 1, limit: 10 },
+          { hasRowErrors: false },
+        );
+
+        expect(result.items.map((u) => u.id).sort()).toEqual(
+          [clean.id, failed.id, pending.id].sort(),
+        );
+        expect(result.total).toBe(3);
+      });
+
+      it('countCompletedWithRowErrors counts only the user completed uploads with failures', async () => {
+        await seedOutcomes();
+
+        expect(await uploads.countCompletedWithRowErrors(USER_ID)).toBe(1);
+        expect(await uploads.countCompletedWithRowErrors('nobody')).toBe(0);
+      });
+    });
+
     it('countByStatus fills zeros', async () => {
       const processing = newUpload();
       processing.startProcessing(1);
