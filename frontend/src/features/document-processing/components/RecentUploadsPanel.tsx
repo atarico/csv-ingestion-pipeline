@@ -4,7 +4,7 @@ import { ChevronRightIcon, InboxIcon } from '@/shared/components/icons';
 import { RowHealthBar } from '@/shared/components/RowHealthBar';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { formatDateTime, formatNumber, formatRelativeTime } from '@/shared/lib/format';
-import { OUTCOME_PANEL_ID, TONE_STYLES, outcomeTabId, type OutcomeDefinition } from '../lib/outcomes';
+import { OUTCOME_PANEL_ID, TONE_STYLES, outcomeTabId, uploadsListHref, type OutcomeDefinition } from '../lib/outcomes';
 import type { UploadSummaryDto } from '../types/upload.types';
 
 const SKELETON_ROWS = 5;
@@ -89,7 +89,7 @@ export function RecentUploadsPanel({ outcome, uploads, isLoading, errorMessage, 
           <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${TONE_STYLES[outcome.tone].dot}`} />
           {heading}
         </h2>
-        <Link href="/uploads" className="text-sm font-medium text-primary hover:underline">
+        <Link href={uploadsListHref(outcome.key)} className="text-sm font-medium text-primary hover:underline">
           Ver todos
         </Link>
       </div>

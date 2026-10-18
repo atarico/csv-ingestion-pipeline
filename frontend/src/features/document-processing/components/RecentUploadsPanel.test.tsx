@@ -71,4 +71,14 @@ describe('RecentUploadsPanel', () => {
 
     expect(screen.getByRole('link', { name: 'Ver todos' })).toHaveAttribute('href', '/uploads');
   });
+
+  it.each([
+    ['correct', '/uploads?outcome=correct'],
+    ['withProblems', '/uploads?outcome=withProblems'],
+    ['failed', '/uploads?outcome=failed'],
+  ] as const)('links "Ver todos" to the %s filter', (key, href) => {
+    render(<RecentUploadsPanel outcome={getOutcome(key)} uploads={[]} isLoading={false} onRetry={vi.fn()} />);
+
+    expect(screen.getByRole('link', { name: 'Ver todos' })).toHaveAttribute('href', href);
+  });
 });

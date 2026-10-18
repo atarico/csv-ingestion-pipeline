@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { UploadStatsDto } from '../types/upload.types';
-import { OUTCOMES, distributionOf, getOutcome, shareOf } from './outcomes';
+import { OUTCOMES, distributionOf, getOutcome, parseOutcomeParam, shareOf, uploadsListHref } from './outcomes';
 
 const stats: UploadStatsDto = {
   total: 20,
@@ -60,5 +60,35 @@ describe('outcomes', () => {
       const empty = { ...stats, total: 2, completed: 0, failed: 0, completedWithRowErrors: 0 };
       expect(distributionOf(empty).total).toBe(0);
     });
+  });
+});
+
+describe('parseOutcomeParam', () => {
+  it.each([
+    ['correct', 'correct'],
+    ['withProblems', 'withProblems'],
+    ['failed', 'failed'],
+    ['all', 'all'],
+    [undefined, 'all'],
+    ['', 'all'],
+    ['nope', 'all'],
+    ['CORRECT', 'all'],
+  ])('maps %j to %s', (raw, expected) => {
+    expect(parseOutcomeParam(raw)).toBe(expected);
+  });
+});
+
+describe('uploadsListHref', () => {
+  it('omits default params', () => {
+    expect(uploadsListHref('all', 1)).toBe('/uploads');
+  });
+
+  it('keeps the outcome and drops page 1', () => {
+    expect(uploadsListHref('failed', 1)).toBe('/uploads?outcome=failed');
+  });
+
+  it('keeps both when set', () => {
+    expect(uploadsListHref('withProblems', 3)).toBe('/uploads?outcome=withProblems&page=3');
+    expect(uploadsListHref('all', 2)).toBe('/uploads?page=2');
   });
 });

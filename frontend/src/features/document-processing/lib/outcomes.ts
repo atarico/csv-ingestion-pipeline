@@ -104,3 +104,17 @@ export const OUTCOME_PANEL_ID = 'outcome-panel';
 export function outcomeTabId(key: OutcomeKey): string {
   return `outcome-tab-${key}`;
 }
+
+/** Parses the `outcome` search param: anything that is not a known key becomes `all`. */
+export function parseOutcomeParam(raw: string | undefined): OutcomeKey {
+  return OUTCOMES.find((outcome) => outcome.key === raw)?.key ?? 'all';
+}
+
+/** URL of the uploads list; default values (`all`, page 1) are omitted to keep links clean. */
+export function uploadsListHref(outcome: OutcomeKey, page = 1): string {
+  const params = new URLSearchParams();
+  if (outcome !== 'all') params.set('outcome', outcome);
+  if (page > 1) params.set('page', String(page));
+  const query = params.toString();
+  return query === '' ? '/uploads' : `/uploads?${query}`;
+}
