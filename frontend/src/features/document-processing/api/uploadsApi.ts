@@ -10,7 +10,7 @@ import { uploadsClient } from './uploadsClient';
 export const uploadKeys = {
   all: ['uploads'] as const,
   lists: () => [...uploadKeys.all, 'list'] as const,
-  list: (page: number) => [...uploadKeys.lists(), { page }] as const,
+  list: (page: number, outcome: OutcomeKey = 'all') => [...uploadKeys.lists(), { page, outcome }] as const,
   recent: (filter: UploadListFilter) => [...uploadKeys.lists(), 'recent', filter] as const,
   details: () => [...uploadKeys.all, 'detail'] as const,
   detail: (id: string) => [...uploadKeys.details(), id] as const,
@@ -24,10 +24,11 @@ const RECENT_LIMIT = 10;
 /** sessionStorage key read by the detail page to show the "uploaded" banner once. */
 export const JUST_UPLOADED_KEY = 'carbonbox:just-uploaded';
 
-export function useUploads(page: number) {
+export function useUploads(page: number, outcomeKey: OutcomeKey = 'all') {
+  const { filter } = getOutcome(outcomeKey);
   return useQuery({
-    queryKey: uploadKeys.list(page),
-    queryFn: () => uploadsClient.list(page),
+    queryKey: uploadKeys.list(page, outcomeKey),
+    queryFn: () => uploadsClient.list(page, filter),
     refetchInterval: LIST_REFRESH_MS,
     placeholderData: keepPreviousData,
   });
