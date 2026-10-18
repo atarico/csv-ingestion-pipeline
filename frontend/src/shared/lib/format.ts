@@ -8,7 +8,8 @@ export function formatDateTime(iso: string): string {
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-const numberFormat = new Intl.NumberFormat('es', { maximumFractionDigits: 4 });
+// 'always' groups 4-digit numbers too (locale 'es' otherwise writes 9000 but 10.000).
+const numberFormat = new Intl.NumberFormat('es', { maximumFractionDigits: 4, useGrouping: 'always' });
 
 export function formatNumber(value: number): string {
   return numberFormat.format(value);

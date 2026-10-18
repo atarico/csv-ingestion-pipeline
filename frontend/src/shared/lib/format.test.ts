@@ -14,6 +14,12 @@ describe('format', () => {
     expect(formatNumber(12345.67891)).toBe('12.345,6789');
   });
 
+  it('formatNumber groups 4-digit numbers like larger ones', () => {
+    expect(formatNumber(9000)).toBe('9.000');
+    expect(formatNumber(10000)).toBe('10.000');
+    expect(formatNumber(999)).toBe('999');
+  });
+
   it('formatBytes uses 1024 base, es locale and one decimal', () => {
     expect(formatBytes(0)).toBe('0 B');
     expect(formatBytes(999)).toBe('999 B');

@@ -115,6 +115,14 @@ export function ChevronRightIcon({ className }: IconProps) {
   );
 }
 
+export function ChevronLeftIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="m15 6-6 6 6 6" />
+    </Icon>
+  );
+}
+
 export function InboxIcon({ className }: IconProps) {
   return (
     <Icon className={className}>
