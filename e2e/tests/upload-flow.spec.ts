@@ -29,9 +29,9 @@ test.describe('CSV upload flow', () => {
     await expectStatus(page, 'Completado');
     await expect(page.getByText('Filas procesadas: 19 · Filas con errores: 6')).toBeVisible();
 
-    const errorsTable = page
-      .getByRole('heading', { name: 'Filas con errores' })
-      .locator('xpath=following-sibling::div[1]');
+    // The errors tab is the default one for an upload with row errors.
+    await expect(page.getByRole('tab', { name: /^Filas con errores/ })).toHaveAttribute('aria-selected', 'true');
+    const errorsTable = page.getByRole('tabpanel');
     // Rows 3, 7, 11, 15, 19 have one defect each; row 23 has two (unit and date).
     const expected: Array<[row: string, field: string]> = [
       ['3', 'amount'],

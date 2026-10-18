@@ -125,6 +125,82 @@ describe('UploadDetail failure guidance', () => {
 
     expect(await screen.findByText('Ninguna fila pudo procesarse')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Filas con errores' })).toBeInTheDocument();
-    expect(screen.getByText(/«abc» no es un número válido/)).toBeInTheDocument();
+    expect(screen.getAllByText(/«abc» no es un número válido/).length).toBeGreaterThan(0);
+  });
+});
+
+describe('UploadDetail completed upload', () => {
+  const completed: UploadDto = {
+    ...upload,
+    status: 'COMPLETED',
+    totalRows: 3,
+    processedRows: 2,
+    failedRows: 1,
+    rowErrors: [{ row: 2, field: 'amount', code: 'INVALID_NUMBER', message: 'bad', value: 'abc' }],
+  };
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.mocked(uploadsClient.results).mockResolvedValue({
+      data: [{ id: 'a1', rowNumber: 1, category: 'Energy', amount: 10, unit: 'kWh', date: '2024-01-01' }],
+      total: 2,
+      page: 1,
+      limit: 20,
+      totalPages: 1,
+    });
+  });
+
+  it('summarises the counts in tiles', async () => {
+    vi.mocked(uploadsClient.getById).mockResolvedValue(completed);
+    renderDetail();
+
+    expect(await screen.findByText('Filas totales')).toBeInTheDocument();
+    expect(screen.getByText('% válidas')).toBeInTheDocument();
+    expect(screen.getByText('Filas procesadas: 2 · Filas con errores: 1')).toBeInTheDocument();
+  });
+
+  it('opens on "Filas con errores" when the upload has row errors, and switches tabs', async () => {
+    vi.mocked(uploadsClient.getById).mockResolvedValue(completed);
+    renderDetail();
+
+    const errorsTab = await screen.findByRole('tab', { name: /^Filas con errores/ });
+    expect(errorsTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: 'Filas con errores' })).toBeInTheDocument();
+    expect(screen.getAllByText(/«abc» no es un número válido/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('heading', { name: 'Datos procesados' })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: /^Datos procesados\s*2$/ }));
+
+    expect(await screen.findByRole('heading', { name: 'Datos procesados' })).toBeInTheDocument();
+    expect(await screen.findByText('Energy')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Filas con errores' })).not.toBeInTheDocument();
+  });
+
+  it('shows only the data, with no errors tab, for a clean upload', async () => {
+    vi.mocked(uploadsClient.getById).mockResolvedValue({ ...completed, processedRows: 3, failedRows: 0, rowErrors: [] });
+    renderDetail();
+
+    expect(await screen.findByRole('heading', { name: 'Datos procesados' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Filas con errores/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Filas con errores' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Energy')).toBeInTheDocument();
+  });
+});
+
+describe('UploadDetail failed callout', () => {
+  it('renders the failure as a danger callout alert with the guidance', async () => {
+    sessionStorage.clear();
+    vi.mocked(uploadsClient.getById).mockResolvedValue({
+      ...upload,
+      status: 'FAILED',
+      errorCode: 'EMPTY_FILE',
+      errorMessage: 'File is empty',
+    });
+    renderDetail();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('El archivo está vacío');
+    expect(alert).toHaveTextContent('Exporta de nuevo la planilla como CSV');
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
   });
 });

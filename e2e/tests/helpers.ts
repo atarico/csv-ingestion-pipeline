@@ -31,7 +31,7 @@ export async function uploadCsv(page: Page, name: string, buffer: Buffer) {
   await page.getByRole('button', { name: 'Sí, procesar' }).click();
   await expect(page).toHaveURL(/\/uploads\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { name: 'Detalle del upload' })).toBeVisible();
-  await expect(page.getByRole('definition').filter({ hasText: name })).toBeVisible();
+  await expect(page.getByRole('heading', { name })).toBeVisible();
 }
 
 /** Waits (polling the UI, which refreshes itself every 3 s) for a terminal status badge. */
