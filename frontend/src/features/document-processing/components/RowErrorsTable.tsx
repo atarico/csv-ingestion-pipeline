@@ -19,10 +19,12 @@ function fieldLabel(field: string): string {
 }
 
 export function RowErrorsTable({ errors, failedRows }: RowErrorsTableProps) {
-  const [field, setField] = useState<string | null>(null);
+  const [selectedField, setField] = useState<string | null>(null);
   const [requestedPage, setRequestedPage] = useState(1);
 
   const fields = countByField(errors);
+  // A refetch can drop the selected field; fall back to every error instead of an empty table.
+  const field = fields.some((entry) => entry.field === selectedField) ? selectedField : null;
   const filtered = filterByField(errors, field);
   const { items, page, totalPages } = paginate(filtered, requestedPage, ERRORS_PAGE_SIZE);
 

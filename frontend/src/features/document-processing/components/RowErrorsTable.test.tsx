@@ -76,6 +76,18 @@ describe('RowErrorsTable', () => {
     expect(screen.getAllByRole('row')).toHaveLength(4);
   });
 
+  it('falls back to every error when the selected field disappears from the list', async () => {
+    const { rerender } = render(<RowErrorsTable errors={errors} failedRows={3} />);
+    const group = screen.getByRole('group', { name: 'Filtrar por columna' });
+    await userEvent.click(within(group).getByRole('button', { name: 'unit 1' }));
+
+    const withoutUnit = errors.filter((error) => error.field !== 'unit');
+    rerender(<RowErrorsTable errors={withoutUnit} failedRows={2} />);
+
+    expect(screen.getAllByRole('row')).toHaveLength(3);
+    expect(screen.getByRole('button', { name: 'Todas 2' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('hides the chips when every error is in the same field', () => {
     render(<RowErrorsTable errors={[errors[0] as RowErrorDto]} failedRows={1} />);
     expect(screen.queryByRole('group', { name: 'Filtrar por columna' })).not.toBeInTheDocument();
