@@ -73,7 +73,7 @@ describe('FileProcessingWorker (real Postgres, in-memory storage and queue)', ()
   });
 
   async function postCsv(content: string, fileName = 'data.csv'): Promise<string> {
-    const boundary = `----carbonbox${randomUUID()}`;
+    const boundary = `----csvpipeline${randomUUID()}`;
     const payload = Buffer.from(
       `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: text/csv\r\n\r\n${content}\r\n--${boundary}--\r\n`,
     );

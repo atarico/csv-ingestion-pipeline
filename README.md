@@ -1,11 +1,12 @@
-# CarbonBox · Procesamiento asíncrono de documentos
+# CSV Pipeline · Procesamiento asíncrono de documentos
 
 [![CI](https://github.com/atarico/csv-ingestion-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/atarico/csv-ingestion-pipeline/actions/workflows/ci.yml)
 
 ## Descripción del proyecto
 
 Sistema de procesamiento asíncrono de archivos CSV de datos de actividad (categoría,
-cantidad, unidad, fecha) para la prueba técnica Full Stack de CarbonBox.
+cantidad, unidad, fecha) para la prueba técnica Full Stack de CarbonBox. Es una solución
+independiente: no está afiliada a CarbonBox ni usa su marca.
 
 1. El usuario sube un CSV desde el frontend (Next.js).
 2. La API (Fastify) guarda el archivo en S3, crea un registro `Upload` en PostgreSQL con
@@ -248,7 +249,7 @@ capa de aplicación nunca importa infraestructura.
 ### Estructura de carpetas
 
 ```
-carbonbox-challenge/
+csv-ingestion-pipeline/
 ├── backend/
 │   ├── prisma.config.ts
 │   └── src/
@@ -278,20 +279,20 @@ carbonbox-challenge/
 
 ## Interfaz
 
-La interfaz usa los tokens de marca observados en carbonbox.app: azul primario `#1620a4`,
-verde de acento `#2f6b4a`, menta `#7ed3a8`, superficie oscura `#0d1230`, tipografía
-Poppins, botones en forma de píldora y tarjetas con borde fino y sombra suave. Los tokens
-están como variables CSS `--cb-*` (claro y oscuro) en `frontend/src/styles/globals.css` y se
-exponen a Tailwind con `@theme inline`. El logo y los colores de CarbonBox son marcas de
-CarbonBox y se usan solo dentro de esta entrega.
+La interfaz usa estos tokens: azul primario `#1620a4`, verde de acento `#2f6b4a`, menta
+`#7ed3a8`, superficie oscura `#0d1230`, tipografía Poppins, botones en forma de píldora y
+tarjetas con borde fino y sombra suave. Los tokens están como variables CSS `--cb-*` (claro y
+oscuro) en `frontend/src/styles/globals.css` y se exponen a Tailwind con `@theme inline`. El
+logo (una tabla con su fila de encabezado) está en `frontend/src/shared/components/BrandLogo.tsx`
+y el favicon en `frontend/src/app/icon.svg`.
 
-**Desviación de contraste.** El rojo de peligro del sitio (`#c0453f` sobre `#f7e4e3`) tiene
+**Desviación de contraste.** El rojo de peligro original (`#c0453f` sobre `#f7e4e3`) tiene
 una relación de contraste de 4,12:1, por debajo del mínimo de 4,5:1 para texto. Aquí el texto
 de error usa `#a83a35` (5,17:1 sobre el mismo fondo). Una prueba de contraste
 (`tokens.test.ts`) comprueba los pares de colores de ambos temas.
 
 **Tema claro y oscuro.** El botón del encabezado alterna el tema. La elección se guarda en
-`localStorage` con la clave `carbonbox-theme`; si no hay nada guardado, se usa la preferencia
+`localStorage` con la clave `csv-pipeline-theme`; si no hay nada guardado, se usa la preferencia
 del sistema (`prefers-color-scheme`). Un script en línea en el `<head>` aplica el tema antes
 del primer pintado, así que la página no parpadea con el tema equivocado. Si
 `localStorage` no está disponible, el tema sigue la preferencia del sistema.

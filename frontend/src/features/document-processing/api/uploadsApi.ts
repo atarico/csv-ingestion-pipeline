@@ -22,7 +22,7 @@ const LIST_REFRESH_MS = 5000;
 const RECENT_LIMIT = 10;
 
 /** sessionStorage key read by the detail page to show the "uploaded" banner once. */
-export const JUST_UPLOADED_KEY = 'carbonbox:just-uploaded';
+export const JUST_UPLOADED_KEY = 'csv-pipeline:just-uploaded';
 
 export function useUploads(page: number, outcomeKey: OutcomeKey = 'all') {
   const { filter } = getOutcome(outcomeKey);

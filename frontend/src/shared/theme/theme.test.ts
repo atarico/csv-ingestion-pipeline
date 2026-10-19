@@ -36,6 +36,6 @@ describe('applyTheme / readTheme', () => {
   });
 
   it('exposes the storage key', () => {
-    expect(THEME_STORAGE_KEY).toBe('carbonbox-theme');
+    expect(THEME_STORAGE_KEY).toBe('csv-pipeline-theme');
   });
 });

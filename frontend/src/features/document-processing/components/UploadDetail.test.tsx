@@ -11,7 +11,7 @@ vi.mock('../api/uploadsClient', () => ({
 }));
 
 const ID = '11111111-1111-4111-8111-111111111111';
-const FLAG = 'carbonbox:just-uploaded';
+const FLAG = 'csv-pipeline:just-uploaded';
 const BANNER = /El archivo se subió correctamente/;
 
 const upload: UploadDto = {
