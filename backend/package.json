@@ -1,5 +1,5 @@
 {
-  "name": "carbonbox-backend",
+  "name": "csv-pipeline-backend",
   "private": true,
   "type": "module",
   "engines": {

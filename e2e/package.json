@@ -1,8 +1,8 @@
 {
-  "name": "carbonbox-e2e",
+  "name": "csv-pipeline-e2e",
   "version": "1.0.0",
   "private": true,
-  "description": "Black-box browser tests for the CarbonBox CSV upload system",
+  "description": "Black-box browser tests for the CSV Pipeline upload system",
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
