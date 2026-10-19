@@ -26,7 +26,7 @@ export function Layout({ children }: { children: ReactNode }) {
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
       <footer className="mx-auto w-full max-w-5xl px-4 pb-6 text-sm text-ink-muted">
-        CarbonBox · Prueba técnica Full Stack · 2026
+        CSV Pipeline · Prueba técnica Full Stack · 2026
       </footer>
     </div>
   );

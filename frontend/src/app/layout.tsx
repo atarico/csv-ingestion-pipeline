@@ -10,7 +10,7 @@ import { themeScript } from '@/shared/theme/theme-script';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'CarbonBox · Captura de datos',
+  title: 'CSV Pipeline · Captura de datos',
   description: 'Carga de datos de actividad en CSV y seguimiento de su procesamiento',
 };
 
